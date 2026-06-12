@@ -1,5 +1,6 @@
 from src.data_pipeline.backfill_recruitment_jobs_normalized import (
     ChunkResult,
+    REPAIRABLE_SOURCE_TABLE_MAPPINGS,
     build_chunk_insert_sql,
     build_parser,
     build_run_summary,
@@ -52,6 +53,8 @@ def test_build_chunk_insert_sql_uses_conflict_do_nothing_for_missing_only():
     )
 
     assert "ON CONFLICT (source_table, source_row_number) DO NOTHING" in sql
+    assert "RETURNING 1" in sql
+    assert "SELECT count(*) AS inserted_rows" in sql
 
 
 def test_build_chunk_insert_sql_uses_conditional_update_for_full_refresh():
@@ -74,6 +77,27 @@ def test_build_parser_exposes_concurrency_flags():
     assert args.benchmark is True
 
 
+def test_build_parser_uses_benchmarked_default_concurrency_values():
+    parser = build_parser()
+    args = parser.parse_args([])
+
+    assert args.workers == 3
+    assert args.chunk_size == 50000
+
+
 def test_canonicalize_source_table_name_quotes_mixed_case_schema():
     assert canonicalize_source_table_name("Liepin.cleaned_data") == '"Liepin".cleaned_data'
     assert canonicalize_source_table_name('"51job".sample') == '"51job".sample'
+
+
+def test_build_parser_exposes_repair_flag():
+    parser = build_parser()
+    args = parser.parse_args(["--repair-source-table-values"])
+
+    assert args.repair_source_table_values is True
+
+
+def test_repairable_source_table_mappings_cover_known_bad_cleaned_tables():
+    assert REPAIRABLE_SOURCE_TABLE_MAPPINGS['"Liepin"."cleaned_data"'] == '"Liepin".cleaned_data'
+    assert REPAIRABLE_SOURCE_TABLE_MAPPINGS['"51job"."cleaned_data"'] == '"51job".cleaned_data'
+    assert REPAIRABLE_SOURCE_TABLE_MAPPINGS['"Zhilian"."cleaned_data"'] == '"Zhilian".cleaned_data'

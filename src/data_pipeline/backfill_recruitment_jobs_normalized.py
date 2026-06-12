@@ -48,8 +48,17 @@ DEFAULT_FULL_SOURCE_TABLES = [
     '"Zhilian".cleaned_data',
 ]
 
+REPAIRABLE_SOURCE_TABLE_MAPPINGS = {
+    '"51job"."cleaned_data"': '"51job".cleaned_data',
+    '"Liepin"."cleaned_data"': '"Liepin".cleaned_data',
+    '"Zhilian"."cleaned_data"': '"Zhilian".cleaned_data',
+    '"51job"."sample"': '"51job".sample',
+    '"Liepin"."sample"': '"Liepin".sample',
+    '"Zhilian"."sample"': '"Zhilian".sample',
+}
+
 DEFAULT_WORKERS = 3
-DEFAULT_CHUNK_SIZE = 200000
+DEFAULT_CHUNK_SIZE = 50000
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_POOL_RECYCLE_SECONDS = 1800
 
@@ -354,44 +363,137 @@ def build_chunk_insert_sql(
                 {_sql_safe_text('"公司行业"')} AS company_industry_raw
             FROM selected src
         )
-        INSERT INTO {qualified_normalized} (
-            recruitment_record_id,
-            source_platform,
-            source_table,
-            source_row_number,
-            source_native_job_id,
-            dedupe_fingerprint,
-            job_title,
-            job_description_raw,
-            work_city,
-            company_name,
-            publish_date,
-            salary_raw,
-            education_requirement_raw,
-            experience_requirement_raw,
-            company_size_raw,
-            company_industry_raw
+        , inserted AS (
+            INSERT INTO {qualified_normalized} (
+                recruitment_record_id,
+                source_platform,
+                source_table,
+                source_row_number,
+                source_native_job_id,
+                dedupe_fingerprint,
+                job_title,
+                job_description_raw,
+                work_city,
+                company_name,
+                publish_date,
+                salary_raw,
+                education_requirement_raw,
+                experience_requirement_raw,
+                company_size_raw,
+                company_industry_raw
+            )
+            SELECT
+                recruitment_record_id,
+                source_platform,
+                source_table,
+                source_row_number,
+                source_native_job_id,
+                dedupe_fingerprint,
+                job_title,
+                job_description_raw,
+                work_city,
+                company_name,
+                publish_date,
+                salary_raw,
+                education_requirement_raw,
+                experience_requirement_raw,
+                company_size_raw,
+                company_industry_raw
+            FROM prepared
+            {conflict_sql}
+            RETURNING 1
         )
-        SELECT
-            recruitment_record_id,
-            source_platform,
-            source_table,
-            source_row_number,
-            source_native_job_id,
-            dedupe_fingerprint,
-            job_title,
-            job_description_raw,
-            work_city,
-            company_name,
-            publish_date,
-            salary_raw,
-            education_requirement_raw,
-            experience_requirement_raw,
-            company_size_raw,
-            company_industry_raw
-        FROM prepared
-        {conflict_sql}
+        SELECT count(*) AS inserted_rows
+        FROM inserted
     """
+
+
+def repair_source_table_values(
+    *,
+    normalized_table: str = DEFAULT_NORMALIZED_TABLE,
+    locator_table: str = DEFAULT_BACKFILL_LOCATOR_TABLE,
+    chunk_state_table: str = DEFAULT_BACKFILL_CHUNK_STATE_TABLE,
+    mappings: dict[str, str] | None = None,
+) -> dict[str, dict[str, int]]:
+    """修复历史错误的 source_table 值，并清理对应 runtime 行。
+
+    说明:
+        该函数只处理已知坏值 -> 正确值的映射。
+        若目标表中已存在相同 source_row_number 的正确值，会先删除正确值，再把坏值改名，
+        以避免 `(source_table, source_row_number)` 唯一键冲突。
+    """
+    mapping_items = list((mappings or REPAIRABLE_SOURCE_TABLE_MAPPINGS).items())
+    if not mapping_items:
+        return {}
+
+    normalized_table_name = quote_table_name(normalized_table)
+    locator_table_name = quote_table_name(locator_table)
+    chunk_state_table_name = quote_table_name(chunk_state_table)
+    repair_summary: dict[str, dict[str, int]] = {}
+
+    engine = create_pg_engine()
+    try:
+        with engine.begin() as connection:
+            for bad_source_table, good_source_table in mapping_items:
+                deleted_conflicts = connection.execute(
+                    text(
+                        f"""
+                        DELETE FROM {normalized_table_name} target
+                        USING {normalized_table_name} bad
+                        WHERE bad.source_table = :bad_source_table
+                          AND target.source_table = :good_source_table
+                          AND target.source_row_number = bad.source_row_number
+                        """
+                    ),
+                    {
+                        "bad_source_table": bad_source_table,
+                        "good_source_table": good_source_table,
+                    },
+                ).rowcount or 0
+                updated_rows = connection.execute(
+                    text(
+                        f"""
+                        UPDATE {normalized_table_name}
+                        SET source_table = :good_source_table
+                        WHERE source_table = :bad_source_table
+                        """
+                    ),
+                    {
+                        "bad_source_table": bad_source_table,
+                        "good_source_table": good_source_table,
+                    },
+                ).rowcount or 0
+                deleted_chunk_rows = connection.execute(
+                    text(
+                        f"""
+                        DELETE FROM {chunk_state_table_name}
+                        WHERE source_table = :bad_source_table
+                        """
+                    ),
+                    {"bad_source_table": bad_source_table},
+                ).rowcount or 0
+                deleted_locator_rows = connection.execute(
+                    text(
+                        f"""
+                        DELETE FROM {locator_table_name}
+                        WHERE source_table = :bad_source_table
+                        """
+                    ),
+                    {"bad_source_table": bad_source_table},
+                ).rowcount or 0
+                if any((deleted_conflicts, updated_rows, deleted_chunk_rows, deleted_locator_rows)):
+                    repair_summary[bad_source_table] = {
+                        "deleted_conflicting_rows": int(deleted_conflicts),
+                        "updated_rows": int(updated_rows),
+                        "deleted_chunk_rows": int(deleted_chunk_rows),
+                        "deleted_locator_rows": int(deleted_locator_rows),
+                        "target_source_table": good_source_table,
+                    }
+            connection.execute(text(f"ANALYZE {normalized_table_name}"))
+    finally:
+        engine.dispose()
+
+    return repair_summary
 
 
 def _effective_locator_limit_rows(limit_rows: int | None, max_chunks: int | None, chunk_size: int) -> int | None:
@@ -697,7 +799,7 @@ def _execute_backfill_chunk(
 ) -> int:
     """执行单个 chunk 的 SQL 回填。"""
     source_platform = infer_source_platform(chunk_plan.source_table)
-    result = connection.execute(
+    inserted_rows = connection.execute(
         text(
             build_chunk_insert_sql(
                 locator_table=locator_table,
@@ -712,8 +814,8 @@ def _execute_backfill_chunk(
             "source_platform": source_platform,
             "chunk_id": int(chunk_plan.chunk_id),
         },
-    )
-    return int(result.rowcount or 0)
+    ).scalar_one()
+    return int(inserted_rows or 0)
 
 
 def _count_locator_backfill_rows(
@@ -1129,13 +1231,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--workers",
         type=int,
         default=DEFAULT_WORKERS,
-        help="SQL chunk 并发 worker 数；默认 3",
+        help="SQL chunk 并发 worker 数；默认 3，当前压测推荐值",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=DEFAULT_CHUNK_SIZE,
-        help="每个 SQL chunk 覆盖的 source_row_number 行数",
+        help="每个 SQL chunk 覆盖的 source_row_number 行数；默认 50000，当前压测推荐值",
     )
     parser.add_argument(
         "--max-chunks",
@@ -1181,12 +1283,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="SQLAlchemy 连接池 max_overflow；默认跟 workers 对齐",
     )
+    parser.add_argument(
+        "--repair-source-table-values",
+        action="store_true",
+        help="先修复历史错误的 source_table 值，再执行回填",
+    )
     return parser
 
 
 def main() -> None:
     """CLI 入口。"""
     args = build_parser().parse_args()
+    if bool(args.repair_source_table_values):
+        repair_summary = repair_source_table_values(normalized_table=args.normalized_table)
+        logger.info("repair summary: %s", json.dumps(repair_summary, ensure_ascii=False))
     source_tables = args.source_table
     if source_tables is None and bool(args.full):
         source_tables = DEFAULT_FULL_SOURCE_TABLES
