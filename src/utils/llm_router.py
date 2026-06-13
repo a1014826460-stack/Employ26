@@ -96,28 +96,39 @@ class LLMRouter:
     ) -> str:
         if not self.is_configured():
             raise RuntimeError("LLMRouter 未配置 api_key/base_url")
-        if self.config.api_mode != "responses":
-            raise ValueError(f"暂不支持 api_mode={self.config.api_mode}")
 
         model = self.get_model(strength)
-        request_kwargs = {
-            "model": model,
-            "input": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "max_output_tokens": int(max_output_tokens or self.config.max_output_tokens),
-            "timeout": float(self.config.timeout),
-        }
-        effort = reasoning_effort if reasoning_effort is not None else self.config.reasoning_effort
-        if effort:
-            request_kwargs["reasoning"] = {"effort": effort}
+        api_mode = self.config.api_mode
 
         last_error: Exception | None = None
         for attempt in range(1, self.config.retry + 1):
             try:
-                response = self._get_client().responses.create(**request_kwargs)
-                return extract_response_text(response)
+                if api_mode == "chat":
+                    response = self._get_client().chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        max_tokens=int(max_output_tokens or self.config.max_output_tokens),
+                        timeout=float(self.config.timeout),
+                    )
+                    return extract_chat_response_text(response)
+                else:
+                    request_kwargs = {
+                        "model": model,
+                        "input": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "max_output_tokens": int(max_output_tokens or self.config.max_output_tokens),
+                        "timeout": float(self.config.timeout),
+                    }
+                    effort = reasoning_effort if reasoning_effort is not None else self.config.reasoning_effort
+                    if effort:
+                        request_kwargs["reasoning"] = {"effort": effort}
+                    response = self._get_client().responses.create(**request_kwargs)
+                    return extract_response_text(response)
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 logger.warning("LLM 请求失败 attempt=%d/%d model=%s error=%s", attempt, self.config.retry, model, exc)
@@ -205,6 +216,18 @@ def extract_response_text(response: Any) -> str:
             elif hasattr(text_value, "value") and str(text_value.value).strip():
                 parts.append(str(text_value.value).strip())
     return "\n".join(parts).strip()
+
+
+def extract_chat_response_text(response: Any) -> str:
+    """从 Chat Completions API 结果中提取纯文本。"""
+    choices = getattr(response, "choices", []) or []
+    if choices:
+        message = getattr(choices[0], "message", None)
+        if message:
+            content = getattr(message, "content", "")
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+    return ""
 
 
 def extract_json_from_response(text: str) -> Dict[str, Any] | List[Any] | None:

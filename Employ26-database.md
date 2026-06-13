@@ -135,8 +135,9 @@
 - `public.hard_skill_match_results_dev`
 - `public.hard_skill_match_details_dev`
 - `public.hard_skill_match_summary_dev`
+- `public.skill_extraction_v3_results`
 
-这部分主要服务技能抽取、技能匹配与调试。
+这部分主要服务技能抽取、技能匹配与调试。其中 `skill_extraction_v3_results` 是 V3 管线的正式输出表，存储硬技能（含 8 类分类）和软技能（含大五人格维度）的结构化结果。
 
 ### 4.7 采样与测试层
 
@@ -924,6 +925,72 @@ join public.jd_raw j
 - 近似行数：`20`
 - 字段数：`11`
 - 用途：硬技能匹配汇总调试表
+
+##### `public.skill_extraction_v3_results`
+
+- 用途：V3 统一技能抽取管线输出表，同时存储硬技能和软技能结果
+- 定位：V3 管线的正式结果表，替代 `skill_extraction_requirement_matches` 作为新流程入口
+- 写入模块：`src.skill_extraction.v3_result_writer`
+- 唯一键：`recruitment_record_id`
+- 配置键：`config/database.yaml` 中 `tables.skill_extraction_v3_results`
+
+字段：
+
+- `id` — 自增主键
+- `recruitment_record_id` — 招聘记录唯一标识（唯一键）
+- `source_table` — 来源表名
+- `source_row_number` — 来源行号
+- `job_title` — 岗位名称
+- `hard_skills` (`jsonb`) — 硬技能列表，每项含 `name` 和 `category`（8 类之一）
+- `hard_skill_count` — 硬技能数量
+- `soft_skills` (`jsonb`) — 软技能列表，每项含 `name`、`dimension`、`confidence`、`source`
+- `soft_skill_count` — 软技能数量
+- `pipeline_version` — 管线版本，默认 `v3`
+- `extracted_at` — 抽取时间戳
+
+硬技能 category 取值：`programming_language`、`framework`、`database`、`tool`、`office`、`equipment`、`process`、`certification`
+
+软技能 dimension 取值：`openness`、`conscientiousness`、`extraversion`、`agreeableness`、`neuroticism`
+
+索引：
+
+- `idx_v3_results_rid` — `recruitment_record_id`
+- `idx_v3_results_hard_skills` — `hard_skills` GIN
+- `idx_v3_results_soft_skills` — `soft_skills` GIN
+
+推荐查询：
+
+```sql
+-- 查看某条记录的技能抽取结果
+SELECT
+    recruitment_record_id,
+    job_title,
+    hard_skills,
+    hard_skill_count,
+    soft_skills,
+    soft_skill_count,
+    extracted_at
+FROM public.skill_extraction_v3_results
+WHERE recruitment_record_id = :rid;
+
+-- 按硬技能类别统计
+SELECT
+    (hs ->> 'category') AS category,
+    COUNT(*) AS skill_count
+FROM public.skill_extraction_v3_results,
+     LATERAL jsonb_array_elements(hard_skills) AS hs
+GROUP BY category
+ORDER BY skill_count DESC;
+
+-- 按软技能维度统计
+SELECT
+    (ss ->> 'dimension') AS dimension,
+    COUNT(*) AS skill_count
+FROM public.skill_extraction_v3_results,
+     LATERAL jsonb_array_elements(soft_skills) AS ss
+GROUP BY dimension
+ORDER BY skill_count DESC;
+```
 
 ## 9. 常用查询模板
 

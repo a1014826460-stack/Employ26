@@ -292,7 +292,7 @@ def build_context_dataset_from_regression(
         该函数仅用于兼容性兜底，只会生成 `valid_hard_skill` 和 `not_skill`
         两类标签。若需要完整多分类训练集，应优先使用 `llm_label_context_dataset.py`。
     """
-    from .match_flat_skills_to_duckdb import FlatHardSkillMatcher, load_flat_dictionary
+    from .hard_skill_matcher import FlatHardSkillMatcher, load_flat_dictionary
     from .regression_eval import load_regression_dataset
 
     dataset = load_regression_dataset(regression_dataset_path)

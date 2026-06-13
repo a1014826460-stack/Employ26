@@ -409,7 +409,7 @@ class FlatHardSkillMatcher:
         >>> data = load_flat_dictionary("dicts/flat_skill_dictionary.json")
         >>> matcher = FlatHardSkillMatcher(data)
         >>> matcher.match_text("熟练掌握 Java 和 MySQL，了解 Redis")
-        ['Java', 'MySQL', 'Redis']
+        [{'skill_name': 'Java', 'category': 'programming_language'}, ...]
     """
 
     def __init__(self, flat_dictionary: Dict) -> None:
@@ -469,6 +469,9 @@ class FlatHardSkillMatcher:
                 skipped_blacklist += 1
                 continue
 
+            # 读取该技能的 category（可能为 None）
+            skill_category = skill.get("category") or None
+
             # 收集 name + 全部 aliases
             terms: List[Tuple[str, str]] = [(skill_name, "name")]
             for alias in skill.get("aliases", []) or []:
@@ -510,6 +513,7 @@ class FlatHardSkillMatcher:
                         term_role=term_role,
                         is_ascii_like=is_ascii,
                         normalized_term=normalized,
+                        category=skill_category,
                     )
                 )
 
@@ -763,8 +767,12 @@ class FlatHardSkillMatcher:
             if idx not in redundant
         ]
 
-    def match_text(self, text: str) -> List[str]:
-        """对单段文本做硬技能匹配，返回命中的技能名列表。
+    def match_text(self, text: str) -> List[Dict[str, str | None]]:
+        """对单段文本做硬技能匹配，返回命中的技能列表。
+
+        每个结果包含 ``skill_name`` 和 ``category`` 字段。
+        ``category`` 来自词典中对应技能的 ``category`` 字段，
+        未命中词典的候选值为 ``None``。
 
         匹配策略：
             - ASCII-like 词项（如 ``Java``, ``SQL``, ``C++``）：
@@ -780,7 +788,8 @@ class FlatHardSkillMatcher:
             text: 待匹配的岗位文本。
 
         返回:
-            list[str]: 去重后的技能名列表，顺序为首次命中顺序。
+            list[dict]: 去重后的结果列表，每项包含
+            ``skill_name``（str）和 ``category``（str | None）。
         """
         normalized_text = normalize_match_text(text)
         raw_text = safe_lower_text(text)
@@ -789,7 +798,13 @@ class FlatHardSkillMatcher:
 
         candidates = self.match_candidates(text)
         matched_skill_names = [item["skill_name"] for item in candidates]
-        return self._deduplicate_substring_matches(matched_skill_names)
+        deduped_names = self._deduplicate_substring_matches(matched_skill_names)
+        keep_keys = {name.casefold() for name in deduped_names}
+        return [
+            {"skill_name": item["skill_name"], "category": item["category"]}
+            for item in candidates
+            if item["skill_name"].casefold() in keep_keys
+        ]
 
     def match_candidates(self, text: str) -> List[Dict]:
         """返回候选技能及其命中词信息。
@@ -829,6 +844,7 @@ class FlatHardSkillMatcher:
                     "skill_name": resolved_name,
                     "matched_term": entry.term_text,
                     "term_role": entry.term_role,
+                    "category": entry.category,
                 }
             )
 
