@@ -216,26 +216,29 @@ Runtime validation should include a smoke benchmark on a limited number of chunk
 
 ## Initial Tuning Guidance
 
-Benchmarking on the current machine and PostgreSQL settings showed the most stable default is:
+Benchmarking on the current machine and tuned PostgreSQL settings showed the best local default is:
 
-- `workers=3`
-- `chunk_size=50000`
-- `db_pool_size=3`
-- `db_max_overflow=3`
+- `workers=2`
+- `chunk_size=25000`
+- `db_pool_size=2`
+- `db_max_overflow=2`
 
 Observed benchmark findings:
 
 - `200000` row chunks were too large and produced heavy long-tail behavior.
 - `4 × 100000` was slower than `3 × 100000`, which indicates PostgreSQL write pressure saturated before CPU.
 - `3 × 50000` completed the sampled `51job` chunks in roughly `40` to `50` seconds each and the sampled `Liepin` chunks in roughly `65` to `74` seconds each, with less long-tail variance.
+- After PostgreSQL tuning and restart, a local matrix test found `2 × 25000` highest among the sampled combinations, with roughly `1217 rows/s`; `4 × 25000` and `3 × 25000` were close but slightly slower.
+- `75000` row chunks still produced long-tail behavior and timed out in the small matrix, so they are not recommended as a default.
 
 Future comparisons should stay near the observed stable zone:
 
-- `3 × 50000`
+- `2 × 25000`
+- `3 × 25000`
+- `4 × 25000`
 - `2 × 50000`
-- `3 × 75000`
 
-The current recommended production default is `3 × 50000`. PostgreSQL write pressure dominates before CPU saturation on this workload.
+The current recommended production default is `2 × 25000`. PostgreSQL write pressure dominates before CPU saturation on this workload.
 
 ## Risks and Mitigations
 

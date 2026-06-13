@@ -41,6 +41,12 @@
 - `annotations`
 - `public`
 
+补充规范：
+
+- `public` schema 只承载正式公共处理表、兼容 view 和历史遗留小样本表
+- benchmark、压测、临时验证或其他测试数据需要写入 PostgreSQL 时，必须使用 `test` schema，禁止写入 `public` schema
+- 已存在于 `public` 的 legacy 测试表仅作为历史现状记录；新增或重建测试表时应迁入 `test`
+
 共 28 张业务表。
 
 按 `pg_stat_user_tables.n_live_tup` 估算的规模如下：
@@ -144,6 +150,12 @@
 - `public.medium_sample`
 - `public.test_sample`
 - `public.e2e_test`
+
+说明：
+
+- 上述 `public.test_sample`、`public.e2e_test` 是历史遗留测试表，文档保留其现状记录
+- 后续 benchmark、压测、临时验证或其他测试数据写入 PostgreSQL 时，应统一写入 `test` schema
+- 禁止在 `public` schema 新增 benchmark / bench / test 目的的临时表，避免污染正式公共层
 
 ## 5. 当前结构现状
 

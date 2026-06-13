@@ -81,8 +81,8 @@ def test_build_parser_uses_benchmarked_default_concurrency_values():
     parser = build_parser()
     args = parser.parse_args([])
 
-    assert args.workers == 3
-    assert args.chunk_size == 50000
+    assert args.workers == 2
+    assert args.chunk_size == 25000
 
 
 def test_canonicalize_source_table_name_quotes_mixed_case_schema():

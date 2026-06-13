@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> 最后更新: 2026-06-08
+> 最后更新: 2026-06-13
 > 适用对象: Codex、Claude Code、Cursor Agent 等代码代理
 
 本文件是本仓库的代理协作规范。它不负责介绍项目背景，也不承担新成员 onboarding；这些内容放在 `README.md`。  
@@ -100,6 +100,7 @@ tasks_table = paths.get_table_name("annotations", "tasks_v2")
 - 招聘源数据位于 `51job` / `Liepin` / `Zhilian` 三组 schema 中，每组包含 `raw_data`、`cleaned_data`、`sample`
 - Label Studio 与 DeepSeek 标注数据位于 `annotations` schema，优先使用 `annotations.v_label_studio_task_annotations_v2` 做日常联查
 - 职业词典、匹配结果、训练特征等公共处理表主要位于 `public`
+- benchmark、压测、临时验证或其他测试数据需要写入 PostgreSQL 时，必须使用 `test` schema，禁止写入 `public` schema
 - 根目录 `Employ26-database.md` 是数据库结构、字段、索引和引用规范的权威文档；改数据库或写 SQL 前必须先查它
 - `config/database.yaml` 只允许写真实存在的 PostgreSQL 表；如果 PG 没有对应表，宁可不配置，也不要写封存 DuckDB 表名
 - 报告类文本输出到 `output/reports/`

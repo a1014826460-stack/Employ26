@@ -9,7 +9,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from typing import List, Dict, Any, Tuple, Optional
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from src.data_pipeline.description_schema import (
     ALIAS_TO_STD,
@@ -727,9 +727,12 @@ def parse_and_write_desc_df_to_postgres(
 def read_source_table_from_postgres(
     source_table: str,
     limit_rows: int | None = None,
+    offset_rows: int = 0,
     only_risk_rows: bool = False,
+    only_unparsed: bool = False,
     risk_parser_version: str = "description_parsing_v3",
     target_table: str = DEFAULT_PARSED_TABLE,
+    source_table_filter: List[str] | None = None,
 ) -> pd.DataFrame:
     """从 PostgreSQL 源表读取岗位数据，并补充稳定到本次查询的行号。"""
     schema_name, table_name = split_table_name(source_table)
@@ -742,10 +745,32 @@ def read_source_table_from_postgres(
             raise ValueError("limit_rows 必须大于 0")
         limit_sql = "LIMIT :limit_rows"
         params["limit_rows"] = int(limit_rows)
+    offset_sql = ""
+    if int(offset_rows) > 0:
+        offset_sql = "OFFSET :offset_rows"
+        params["offset_rows"] = int(offset_rows)
     params["source_table"] = source_table
     params["risk_parser_version"] = risk_parser_version
+    normalized_source_table_filter = [
+        _normalize_source_table_filter_value(item)
+        for item in (source_table_filter or [])
+        if str(item).strip()
+    ]
+    filter_sql = ""
+    if normalized_source_table_filter:
+        filter_sql = 'WHERE s.source_table IN :source_table_filter'
+        params["source_table_filter"] = normalized_source_table_filter
+
+    is_normalized_source = (
+        schema_name == "public"
+        and table_name == "recruitment_jobs_normalized"
+        and not only_risk_rows
+    )
 
     if only_risk_rows:
+        risk_filter_sql = (
+            f"AND s.source_table IN :source_table_filter" if normalized_source_table_filter else ""
+        )
         risk_where = """
             (
                 (coalesce(p.requirements_text, '') = '' and coalesce(p.duties_text, '') = '')
@@ -792,8 +817,10 @@ def read_source_table_from_postgres(
                   ON p.source_table = :source_table
                  AND p.source_row_number = s."__source_row_number"
                 WHERE {risk_where}
+                {risk_filter_sql}
                 ORDER BY s."__source_row_number"
                 {limit_sql}
+                {offset_sql}
                 """
             )
         else:
@@ -811,20 +838,62 @@ def read_source_table_from_postgres(
                  AND p.source_row_number = s."__source_row_number"
                  AND p.parser_version = :risk_parser_version
                 WHERE {risk_where}
+                {risk_filter_sql}
                 ORDER BY s."__source_row_number"
                 {limit_sql}
+                {offset_sql}
                 """
             )
-    else:
+    elif is_normalized_source:
+        parsed_join_sql = ""
+        parsed_where_sql = ""
+        if only_unparsed:
+            parsed_join_sql = (
+                f"LEFT JOIN {target_qualified_table} p "
+                "ON p.recruitment_record_id = s.recruitment_record_id"
+            )
+            parsed_where_sql = (
+                "AND p.recruitment_record_id IS NULL"
+                if filter_sql
+                else "WHERE p.recruitment_record_id IS NULL"
+            )
         query = text(
             f"""
             SELECT
-                row_number() OVER (ORDER BY ctid) AS "__source_row_number",
-                *
-            FROM {qualified_table}
+                s.source_row_number AS "__source_row_number",
+                s.recruitment_record_id,
+                s.source_platform,
+                s.source_table,
+                s.source_row_number,
+                s.job_title,
+                s.job_description_raw
+            FROM {qualified_table} s
+            {parsed_join_sql}
+            {filter_sql}
+            {parsed_where_sql}
+            ORDER BY s.source_table, s.source_row_number
             {limit_sql}
+            {offset_sql}
             """
         )
+    else:
+        query = text(
+            f"""
+            SELECT *
+            FROM (
+                SELECT
+                    row_number() OVER (ORDER BY ctid) AS "__source_row_number",
+                    *
+                FROM {qualified_table}
+            ) s
+            {filter_sql}
+            ORDER BY s."__source_row_number"
+            {limit_sql}
+            {offset_sql}
+            """
+        )
+    if normalized_source_table_filter:
+        query = query.bindparams(bindparam("source_table_filter", expanding=True))
     engine = create_pg_engine()
     try:
         with engine.connect() as connection:
@@ -833,6 +902,29 @@ def read_source_table_from_postgres(
             return pd.read_sql_query(query, connection, params=params)
     finally:
         engine.dispose()
+
+
+def _normalize_source_table_filter_value(value: object) -> str:
+    """规范化 source_table 过滤值，兼容 PowerShell native 参数吞掉双引号的情况。"""
+    text_value = str(value).strip().replace('\\"', '"')
+    if text_value in {
+        "51job.cleaned_data",
+        "51job.sample",
+        "51job.raw_data",
+    }:
+        schema_name, table_name = text_value.split(".", 1)
+        return f'"{schema_name}".{table_name}'
+    if text_value in {
+        "Liepin.cleaned_data",
+        "Liepin.sample",
+        "Liepin.raw_data",
+        "Zhilian.cleaned_data",
+        "Zhilian.sample",
+        "Zhilian.raw_data",
+    }:
+        schema_name, table_name = text_value.split(".", 1)
+        return f'"{schema_name}".{table_name}'
+    return text_value
 
 
 def build_issue_dataframe(parsed_df: pd.DataFrame) -> pd.DataFrame:
@@ -902,7 +994,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--target-table", default=DEFAULT_PARSED_TABLE, help="PostgreSQL 解析结果表名")
     parser.add_argument("--write-postgres", action="store_true", help="将解析结果写入 PostgreSQL")
     parser.add_argument("--limit-rows", type=int, default=None, help="仅用于调试，限制 PostgreSQL 源表读取行数")
+    parser.add_argument(
+        "--source-table-filter",
+        nargs="*",
+        default=None,
+        help="可选：按输入表中的 source_table 字段过滤；常用于 public.recruitment_jobs_normalized",
+    )
     parser.add_argument("--only-risk-rows", action="store_true", help="仅重跑上一版本解析结果中的高风险行")
+    parser.add_argument(
+        "--only-unparsed",
+        action="store_true",
+        help="仅解析目标表中尚不存在 recruitment_record_id 的记录；适合全量任务断点续跑",
+    )
     parser.add_argument(
         "--risk-parser-version",
         default="latest",
@@ -910,6 +1013,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--parse-workers", type=int, default=32, help="岗位描述切分并发数")
     parser.add_argument("--parse-batch-size", type=int, default=20000, help="岗位描述切分批大小")
+    parser.add_argument(
+        "--read-batch-size",
+        type=int,
+        default=0,
+        help="PostgreSQL 分批读取行数；0 表示一次性读取，推荐全量任务设置为较大正整数",
+    )
     return parser
 
 
@@ -962,34 +1071,53 @@ def main() -> None:
         raise ValueError("--input-source postgres 需要提供 --source-table")
     output_frames: List[pd.DataFrame] = []
     for source_table, source_platform in zip(source_tables, source_platforms):
-        df = read_source_table_from_postgres(
-            source_table=source_table,
-            limit_rows=args.limit_rows,
-            only_risk_rows=bool(args.only_risk_rows),
-            risk_parser_version=args.risk_parser_version,
-            target_table=args.target_table,
-        )
-        parsed_df = parse_desc_df(
-            df,
-            desc_col=args.desc_col,
-            batch_size=max(1, int(args.parse_batch_size)),
-            num_workers=max(1, int(args.parse_workers)),
-        )
-        if args.output_csv:
-            parsed_df = parsed_df.copy()
-            parsed_df["__parsed_source_table"] = source_table
-            output_frames.append(parsed_df)
-
-        if args.write_postgres:
-            rows = build_parsed_pg_rows(
-                parsed_df=parsed_df,
+        read_batch_size = max(0, int(args.read_batch_size))
+        total_written_count = 0
+        total_read_count = 0
+        while True:
+            current_limit = args.limit_rows
+            if read_batch_size > 0:
+                remaining = None if args.limit_rows is None else int(args.limit_rows) - total_read_count
+                if remaining is not None and remaining <= 0:
+                    break
+                current_limit = min(read_batch_size, remaining) if remaining is not None else read_batch_size
+            df = read_source_table_from_postgres(
                 source_table=source_table,
-                source_platform=source_platform,
-                title_col=args.title_col,
-                desc_col=args.desc_col,
+                limit_rows=current_limit,
+                only_risk_rows=bool(args.only_risk_rows),
+                only_unparsed=bool(args.only_unparsed),
+                risk_parser_version=args.risk_parser_version,
+                target_table=args.target_table,
+                source_table_filter=args.source_table_filter,
+                offset_rows=0 if bool(args.only_unparsed) else (total_read_count if read_batch_size > 0 else 0),
             )
-            written_count = write_parsed_rows_to_postgres(rows, table_name=args.target_table)
-            print(f"{source_table} written rows: {written_count}")
+            if df.empty:
+                break
+            total_read_count += len(df)
+            parsed_df = parse_desc_df(
+                df,
+                desc_col=args.desc_col,
+                batch_size=max(1, int(args.parse_batch_size)),
+                num_workers=max(1, int(args.parse_workers)),
+            )
+            if args.output_csv:
+                parsed_df = parsed_df.copy()
+                parsed_df["__parsed_source_table"] = source_table
+                output_frames.append(parsed_df)
+
+            if args.write_postgres:
+                rows = build_parsed_pg_rows(
+                    parsed_df=parsed_df,
+                    source_table=source_table,
+                    source_platform=source_platform,
+                    title_col=args.title_col,
+                    desc_col=args.desc_col,
+                )
+                written_count = write_parsed_rows_to_postgres(rows, table_name=args.target_table)
+                total_written_count += int(written_count)
+                print(f"{source_table} batch written rows: {written_count}; total written rows: {total_written_count}")
+            if read_batch_size <= 0 or len(df) < int(current_limit):
+                break
 
     if args.output_csv and output_frames:
         pd.concat(output_frames, ignore_index=True).to_csv(

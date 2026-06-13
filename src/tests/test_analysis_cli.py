@@ -8,6 +8,8 @@ def test_build_parser_accepts_structured_defaults():
     assert args.structured_command is None
     assert args.with_excel is False
     assert args.skip_standardized is False
+    assert args.structured_workers == 4
+    assert args.with_legacy_copies is False
 
 
 def test_build_parser_accepts_structured_run_defaults():
@@ -19,21 +21,25 @@ def test_build_parser_accepts_structured_run_defaults():
 
 def test_build_parser_accepts_structured_options():
     args = cli.build_parser().parse_args(
-        ["structured", "--with-excel"]
+        ["structured", "--with-excel", "--structured-workers", "8", "--with-legacy-copies"]
     )
 
     assert args.command == "structured"
     assert args.with_excel is True
+    assert args.structured_workers == 8
+    assert args.with_legacy_copies is True
 
 
 def test_build_parser_accepts_structured_run_options():
     args = cli.build_parser().parse_args(
-        ["structured", "run", "--with-excel"]
+        ["structured", "run", "--with-excel", "--structured-workers", "6", "--with-legacy-copies"]
     )
 
     assert args.command == "structured"
     assert args.structured_command == "run"
     assert args.with_excel is True
+    assert args.structured_workers == 6
+    assert args.with_legacy_copies is True
 
 
 def test_build_parser_accepts_requirements_options():

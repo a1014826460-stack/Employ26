@@ -57,8 +57,8 @@ REPAIRABLE_SOURCE_TABLE_MAPPINGS = {
     '"Zhilian"."sample"': '"Zhilian".sample',
 }
 
-DEFAULT_WORKERS = 3
-DEFAULT_CHUNK_SIZE = 50000
+DEFAULT_WORKERS = 2
+DEFAULT_CHUNK_SIZE = 25000
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_POOL_RECYCLE_SECONDS = 1800
 
@@ -1231,13 +1231,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--workers",
         type=int,
         default=DEFAULT_WORKERS,
-        help="SQL chunk 并发 worker 数；默认 3，当前压测推荐值",
+        help="SQL chunk 并发 worker 数；默认 2，当前压测推荐值",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=DEFAULT_CHUNK_SIZE,
-        help="每个 SQL chunk 覆盖的 source_row_number 行数；默认 50000，当前压测推荐值",
+        help="每个 SQL chunk 覆盖的 source_row_number 行数；默认 25000，当前压测推荐值",
     )
     parser.add_argument(
         "--max-chunks",

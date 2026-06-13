@@ -11,6 +11,9 @@ from src.analysis.analysis_common import build_structured_output_dir, write_run_
 from config.paths import get_project_paths
 
 
+_WRITE_LEGACY_CSV_COPIES = False
+
+
 @dataclass(frozen=True)
 class StructuredAnalysisPaths:
     """结构化统计链路使用的输入输出目录。"""
@@ -89,20 +92,41 @@ def load_integrated_data(
         raise ValueError(f"整合数据缺少必需字段: {details}")
 
     return pd.concat(frames, ignore_index=True), [path.name for path in csv_files]
+
+
+def set_write_legacy_csv_copies(enabled: bool) -> None:
+    """设置结构化统计 CSV 是否同时写入历史中文文件名副本。"""
+    global _WRITE_LEGACY_CSV_COPIES
+    _WRITE_LEGACY_CSV_COPIES = bool(enabled)
+
+
+def get_write_legacy_csv_copies() -> bool:
+    """返回当前结构化统计 CSV 历史副本写入设置。"""
+    return _WRITE_LEGACY_CSV_COPIES
+
+
 def write_csv_with_legacy_copy(
     df: pd.DataFrame,
     output_dir: Path,
     *,
     canonical_filename: str,
     legacy_filename: str | None = None,
+    write_legacy_copy: bool | None = None,
 ) -> list[str]:
-    """写入规范 CSV，并按需保留历史中文文件名副本。"""
+    """写入规范 CSV，并可选保留历史中文文件名副本。"""
     output_paths: list[str] = []
     canonical_path = output_dir / canonical_filename
     df.to_csv(canonical_path, index=False, encoding="utf-8-sig")
     output_paths.append(canonical_filename)
-    if legacy_filename and legacy_filename != canonical_filename:
+    should_write_legacy = (
+        get_write_legacy_csv_copies() if write_legacy_copy is None else bool(write_legacy_copy)
+    )
+    if legacy_filename and legacy_filename != canonical_filename and should_write_legacy:
         legacy_path = output_dir / legacy_filename
         df.to_csv(legacy_path, index=False, encoding="utf-8-sig")
         output_paths.append(legacy_filename)
+    elif legacy_filename and legacy_filename != canonical_filename:
+        legacy_path = output_dir / legacy_filename
+        if legacy_path.exists():
+            legacy_path.unlink()
     return output_paths

@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import math
 import re
+from time import sleep
 from collections.abc import Sequence
 
 import pandas as pd
+from sqlalchemy.exc import OperationalError
 from sqlalchemy import text
 
 from src.data_pipeline.description_schema import (
@@ -169,13 +171,18 @@ def build_parsed_pg_rows(
         recruitment_record_id = _safe_text(row.get("recruitment_record_id"))
         if not recruitment_record_id:
             raise KeyError("缺少 recruitment_record_id，无法写入岗位描述解析结果。")
-        source_row_number = _safe_int(row.get("__source_row_number"), fallback_index)
+        row_source_table = _safe_text(row.get("source_table"), source_table)
+        row_source_platform = _safe_text(row.get("source_platform"), platform or infer_source_platform(row_source_table))
+        source_row_number = _safe_int(
+            row.get("source_row_number"),
+            _safe_int(row.get("__source_row_number"), fallback_index),
+        )
         sections_json = _safe_text(row.get(DESCRIPTION_SECTIONS_JSON_COL), "{}")
         rows.append(
             {
                 "recruitment_record_id": recruitment_record_id,
-                "source_platform": platform,
-                "source_table": source_table,
+                "source_platform": row_source_platform,
+                "source_table": row_source_table,
                 "source_row_number": source_row_number,
                 "job_title": _safe_text(row.get(title_col)),
                 "job_description_raw": _safe_text(row.get(desc_col)),
@@ -214,29 +221,39 @@ def write_parsed_rows_to_postgres(
         if column not in {"recruitment_record_id"}
     )
 
-    engine = create_pg_engine()
-    with engine.begin() as connection:
-        ensure_job_description_parsed_table(connection, table_name=table_name)
-        connection.execute(
-            text(
-                f"""
-                INSERT INTO {qualified_table} ({columns_sql})
-                VALUES ({values_sql})
-                ON CONFLICT (recruitment_record_id)
-                DO UPDATE SET
-                    {update_sql},
-                    parsed_at = now()
-                """
+    prepared_rows = [
+        {
+            **row,
+            "description_sections": json.dumps(
+                json.loads(str(row["description_sections"])),
+                ensure_ascii=False,
             ),
-            [
-                {
-                    **row,
-                    "description_sections": json.dumps(
-                        json.loads(str(row["description_sections"])),
-                        ensure_ascii=False,
-                    ),
-                }
-                for row in rows
-            ],
-        )
+        }
+        for row in rows
+    ]
+    statement = text(
+        f"""
+        INSERT INTO {qualified_table} ({columns_sql})
+        VALUES ({values_sql})
+        ON CONFLICT (recruitment_record_id)
+        DO UPDATE SET
+            {update_sql},
+            parsed_at = now()
+        """
+    )
+
+    engine = create_pg_engine()
+    try:
+        for attempt in range(1, 5):
+            try:
+                with engine.begin() as connection:
+                    ensure_job_description_parsed_table(connection, table_name=table_name)
+                    connection.execute(statement, prepared_rows)
+                return len(rows)
+            except OperationalError as exc:
+                if "deadlock detected" not in str(exc).lower() or attempt >= 4:
+                    raise
+                sleep(2 * attempt)
+    finally:
+        engine.dispose()
     return len(rows)

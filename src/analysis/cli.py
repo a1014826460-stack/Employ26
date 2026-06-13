@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 from pathlib import Path
 from typing import Callable
@@ -22,7 +23,11 @@ from src.analysis.requirement_text_analysis import (
     analyze_requirement_texts,
     build_current_output_dir,
 )
-from src.analysis.structured_common import build_structured_output_dir, write_run_manifest
+from src.analysis.structured_common import (
+    build_structured_output_dir,
+    set_write_legacy_csv_copies,
+    write_run_manifest,
+)
 from src.analysis.structured_dimension_analysis import StructuredDimensionAnalyzer
 from src.analysis.structured_pg_source import (
     build_structured_source_coverage,
@@ -33,10 +38,63 @@ from src.analysis.structured_pg_source import (
 logger = logging.getLogger(__name__)
 
 
+STRUCTURED_PARALLEL_STEPS: tuple[tuple[str, Callable[[Path | None, Path], None]], ...] = (
+    (
+        "occupation_salary_analysis",
+        lambda base_dir, output_dir: OccupationSalaryAnalyzer(base_dir=base_dir, output_dir=output_dir).run(),
+    ),
+    (
+        "education_distribution_analysis",
+        lambda base_dir, output_dir: EducationDistributionAnalyzer(base_dir=base_dir, output_dir=output_dir).run(),
+    ),
+    (
+        "industry_trend_analysis",
+        lambda base_dir, output_dir: IndustryTrendAnalyzer(base_dir=base_dir, output_dir=output_dir).run(),
+    ),
+    (
+        "structured_dimension_analysis",
+        lambda base_dir, output_dir: StructuredDimensionAnalyzer(base_dir=base_dir, output_dir=output_dir).run(),
+    ),
+)
+
+
 def _run_step(step_name: str, action: Callable[[], None]) -> None:
     """记录并运行一个分析步骤，保留原始异常方便排查。"""
     logger.info("运行分析步骤: %s", step_name)
     action()
+
+
+def _run_structured_parallel_steps(
+    *,
+    base_dir: Path | None,
+    output_dir: Path,
+    max_workers: int,
+) -> list[str]:
+    """并发运行互不依赖的结构化统计步骤。"""
+    resolved_workers = max(1, int(max_workers))
+    step_items = list(STRUCTURED_PARALLEL_STEPS)
+    if resolved_workers == 1:
+        completed_steps: list[str] = []
+        for step_name, step_action in step_items:
+            _run_step(step_name, lambda action=step_action: action(base_dir, output_dir))
+            completed_steps.append(step_name)
+        return completed_steps
+
+    completed_by_index: list[tuple[int, str]] = []
+    logger.info("并发运行结构化统计步骤: workers=%s, steps=%s", resolved_workers, len(step_items))
+    with ThreadPoolExecutor(max_workers=resolved_workers) as executor:
+        futures = {
+            executor.submit(_run_step, step_name, lambda action=step_action: action(base_dir, output_dir)): (
+                index,
+                step_name,
+            )
+            for index, (step_name, step_action) in enumerate(step_items)
+        }
+        for future in as_completed(futures):
+            step_index, step_name = futures[future]
+            future.result()
+            completed_by_index.append((step_index, step_name))
+    return [step_name for _, step_name in sorted(completed_by_index)]
 
 
 def run_structured(args: argparse.Namespace) -> None:
@@ -45,6 +103,8 @@ def run_structured(args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir) if args.output_dir else build_structured_output_dir()
     output_dir.mkdir(parents=True, exist_ok=True)
     completed_steps: list[str] = []
+    structured_workers = max(1, int(args.structured_workers))
+    set_write_legacy_csv_copies(bool(args.with_legacy_copies))
     coverage = build_structured_source_coverage()
     write_structured_source_coverage(output_dir)
     logger.info(
@@ -59,20 +119,13 @@ def run_structured(args: argparse.Namespace) -> None:
             coverage["matched_share"],
         )
 
-    _run_step("occupation_salary_analysis", lambda: OccupationSalaryAnalyzer(base_dir=base_dir, output_dir=output_dir).run())
-    completed_steps.append("occupation_salary_analysis")
-    _run_step(
-        "education_distribution_analysis",
-        lambda: EducationDistributionAnalyzer(base_dir=base_dir, output_dir=output_dir).run(),
+    completed_steps.extend(
+        _run_structured_parallel_steps(
+            base_dir=base_dir,
+            output_dir=output_dir,
+            max_workers=structured_workers,
+        )
     )
-    completed_steps.append("education_distribution_analysis")
-    _run_step("industry_trend_analysis", lambda: IndustryTrendAnalyzer(base_dir=base_dir, output_dir=output_dir).run())
-    completed_steps.append("industry_trend_analysis")
-    _run_step(
-        "structured_dimension_analysis",
-        lambda: StructuredDimensionAnalyzer(base_dir=base_dir, output_dir=output_dir).run(),
-    )
-    completed_steps.append("structured_dimension_analysis")
 
     if not bool(args.skip_standardized):
         _run_step(
@@ -95,6 +148,8 @@ def run_structured(args: argparse.Namespace) -> None:
         params={
             "with_excel": bool(args.with_excel),
             "skip_standardized": bool(args.skip_standardized),
+            "structured_workers": structured_workers,
+            "with_legacy_copies": bool(args.with_legacy_copies),
             "source": "postgres",
             "normalized_table": "public.recruitment_jobs_normalized",
             "occupation_match_table": "public.skill_extraction_requirement_matches",
@@ -157,6 +212,17 @@ def _add_structured_args(parser: argparse.ArgumentParser) -> None:
         "--skip-standardized",
         action="store_true",
         help="跳过规范化 CSV 汇总表",
+    )
+    parser.add_argument(
+        "--structured-workers",
+        type=int,
+        default=4,
+        help="并发运行互不依赖结构化统计步骤的 worker 数；设为 1 可恢复串行执行",
+    )
+    parser.add_argument(
+        "--with-legacy-copies",
+        action="store_true",
+        help="同时导出历史中文文件名 CSV 副本；默认只保留英文规范文件名",
     )
     parser.add_argument("--output-dir", default="", help="显式指定结构化统计输出目录")
     parser.add_argument("--base-dir", default="", help="显式指定项目根目录（兼容旧脚本）")
