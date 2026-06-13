@@ -24,7 +24,7 @@ from .llm_labeling_utils import (
     stratified_sample_frame,
     write_jsonl,
 )
-from .match_flat_skills_to_duckdb import FlatHardSkillMatcher, load_flat_dictionary
+from .hard_skill_matcher import FlatHardSkillMatcher, load_flat_dictionary
 
 
 logger = logging.getLogger(__name__)

@@ -18,7 +18,7 @@ from .llm_labeling_utils import (
     safe_text,
     write_jsonl,
 )
-from .match_flat_skills_to_duckdb import FlatHardSkillMatcher, load_flat_dictionary
+from .hard_skill_matcher import FlatHardSkillMatcher, load_flat_dictionary
 from .regression_eval import load_regression_dataset
 
 

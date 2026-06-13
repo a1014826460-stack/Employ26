@@ -71,6 +71,7 @@ tables:
     skill_extraction_requirement_matches: public.skill_extraction_requirement_matches
     job_match_results: public.job_match_results
     jd_raw: public.jd_raw
+    skill_extraction_v3_results: public.skill_extraction_v3_results
 
 # PostgreSQL 表引用。只允许写真实存在的 PG 表，不写封存的 DuckDB 表名。
 job_title_parsing:

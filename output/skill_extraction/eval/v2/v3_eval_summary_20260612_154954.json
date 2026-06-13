@@ -1,0 +1,27 @@
+{
+  "evaluated_at": "2026-06-12T15:49:54",
+  "hard_skill_metrics": {
+    "precision": 0.7018348623853211,
+    "recall": 0.9053254437869822,
+    "f1": 0.7906976744186046,
+    "category_accuracy": 1.0,
+    "exact_match_rate": 0.4819277108433735,
+    "tp": 153,
+    "fp": 65,
+    "fn": 16,
+    "sample_count": 83
+  },
+  "soft_skill_metrics": {
+    "coverage": 0.1374233128834356,
+    "precision": 0.09548167092924126,
+    "dimension_accuracy": 0.7410714285714286,
+    "predicted_count": 1173,
+    "gold_count": 815,
+    "matched_count": 112,
+    "sample_count": 300
+  },
+  "dataset_summary": {
+    "hard_skill_sample_count": 83,
+    "soft_skill_sample_count": 300
+  }
+}

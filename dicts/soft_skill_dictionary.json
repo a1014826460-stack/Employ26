@@ -1,0 +1,4 @@
+{
+  "_note": "backward compat shim. use dicts/soft_skill/current.txt for current version.",
+  "_redirect": "dicts/soft_skill/v1.json"
+}

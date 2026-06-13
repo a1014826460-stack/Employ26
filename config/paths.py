@@ -139,6 +139,7 @@ class ProjectPaths:
 
     project_root: Path
     pg_connection_params: dict = field(default_factory=dict)
+    pg_default_schema: str = "public"
     pg_available_schemas: tuple[str, ...] = ()
     table_mappings: dict[str, Any] = field(default_factory=dict)
     model_paths: dict[str, Any] = field(default_factory=dict)
@@ -184,7 +185,7 @@ class ProjectPaths:
             这只是默认 schema，不代表所有表都在同一个 schema 下。
             当前 Employ26 业务 schema 详见 `Employ26-database.md`。
         """
-        return self.pg_connection_params.get("schema", "public")
+        return self.pg_default_schema
 
     def pg_sqlalchemy_url(self, dbname: str | None = None) -> str:
         """返回 SQLAlchemy 使用的 PostgreSQL 连接 URL。"""
@@ -301,8 +302,8 @@ def get_project_paths(
         "dbname": _resolve_setting("dbname", "EMPLOYDATA_PG_DBNAME", "Employ26"),
         "user": _resolve_setting("user", "EMPLOYDATA_PG_USER", "postgres"),
         "password": _resolve_setting("password", "EMPLOYDATA_PG_PASSWORD", ""),
-        "schema": _resolve_setting("schema", "EMPLOYDATA_PG_SCHEMA", "public"),
     }
+    pg_default_schema = _resolve_setting("schema", "EMPLOYDATA_PG_SCHEMA", "public")
     yaml_schemas = yaml_database.get("schemas", []) if isinstance(yaml_database, dict) else []
     pg_available_schemas = tuple(str(schema) for schema in yaml_schemas)
     duckdb_path = root / str(yaml_database.get("duckdb_path", "output/recruit.duckdb"))
@@ -311,6 +312,7 @@ def get_project_paths(
     return ProjectPaths(
         project_root=root,
         pg_connection_params=pg_connection_params,
+        pg_default_schema=pg_default_schema,
         pg_available_schemas=pg_available_schemas,
         table_mappings=yaml_tables if isinstance(yaml_tables, dict) else {},
         model_paths=yaml_models if isinstance(yaml_models, dict) else {},

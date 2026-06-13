@@ -1,0 +1,764 @@
+{
+  "schema_version": 1,
+  "dimensions": {
+    "openness": {
+      "name": "开放性",
+      "skills": [
+        {
+          "name": "创新",
+          "aliases": [
+            "创新能力",
+            "创新思维",
+            "创新意识",
+            "开拓创新"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "好奇心",
+          "aliases": [
+            "求知欲",
+            "好奇心强",
+            "探索欲"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "审美",
+          "aliases": [
+            "审美能力",
+            "审美观",
+            "艺术鉴赏"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "想象力",
+          "aliases": [
+            "想象创造力",
+            "发散思维",
+            "创想能力"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "灵活",
+          "aliases": [
+            "灵活应变",
+            "变通能力",
+            "灵活性",
+            "应变能力"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "学习能力",
+          "aliases": [
+            "快速学习",
+            "自主学习",
+            "学习意愿",
+            "求知好学",
+            "学习能力强",
+            "善于学习",
+            "学习意愿强"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "开放",
+          "aliases": [
+            "思维开放",
+            "开放心态",
+            "心态开放"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "创造力",
+          "aliases": [
+            "创造能力",
+            "创造性思维",
+            "创意能力"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "求知",
+          "aliases": [
+            "求知欲",
+            "好学",
+            "主动学习"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "探索",
+          "aliases": [
+            "探索精神",
+            "勇于探索",
+            "敢于尝试"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "变通",
+          "aliases": [
+            "灵活变通",
+            "随机应变",
+            "通权达变"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "适应力",
+          "aliases": [
+            "适应能力",
+            "环境适应力",
+            "快速适应"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "思维活跃",
+          "aliases": [
+            "思维敏捷",
+            "思路开阔",
+            "头脑灵活"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "接受新事物",
+          "aliases": [
+            "拥抱变化",
+            "接纳新知",
+            "勇于尝新"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "发散思维",
+          "aliases": [
+            "多角度思考",
+            "创造性思维",
+            "逆向思维"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "上进心",
+          "aliases": [
+            "有上进心",
+            "上进心强"
+          ],
+          "dimension": "openness"
+        },
+        {
+          "name": "进取心",
+          "aliases": [
+            "有进取心",
+            "进取心强"
+          ],
+          "dimension": "openness"
+        }
+      ]
+    },
+    "conscientiousness": {
+      "name": "尽责性",
+      "skills": [
+        {
+          "name": "细心",
+          "aliases": [
+            "细致",
+            "注重细节",
+            "一丝不苟",
+            "细心严谨",
+            "细致认真"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "责任心",
+          "aliases": [
+            "责任感",
+            "有担当",
+            "有责任心",
+            "责任心强",
+            "责任感强"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "自律",
+          "aliases": [
+            "自我约束",
+            "自我管理",
+            "严格要求自己"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "计划性",
+          "aliases": [
+            "有计划",
+            "规划能力",
+            "目标管理"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "严谨",
+          "aliases": [
+            "严谨认真",
+            "一丝不苟",
+            "严格要求"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "高效",
+          "aliases": [
+            "高效执行",
+            "高效率",
+            "效率高"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "认真",
+          "aliases": [
+            "认真负责",
+            "态度认真",
+            "一丝不苟"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "踏实",
+          "aliases": [
+            "脚踏实地",
+            "务实",
+            "稳扎稳打"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "细致",
+          "aliases": [
+            "细致入微",
+            "精细",
+            "注重细节"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "执行力",
+          "aliases": [
+            "执行能力强",
+            "行动力强",
+            "落地能力",
+            "执行力强"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "条理",
+          "aliases": [
+            "有条理",
+            "逻辑清晰",
+            "条理分明"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "守时",
+          "aliases": [
+            "准时",
+            "时间观念强",
+            "按时完成"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "尽责",
+          "aliases": [
+            "尽职尽责",
+            "恪尽职守",
+            "勤勉尽责"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "耐心",
+          "aliases": [
+            "有耐心",
+            "耐性好",
+            "不急不躁"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "专注",
+          "aliases": [
+            "专心致志",
+            "心无旁骛",
+            "注意力集中"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "自我管理",
+          "aliases": [
+            "自律性强",
+            "自我驱动",
+            "自我提升"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "时间管理",
+          "aliases": [
+            "时间观念强",
+            "合理安排时间",
+            "统筹时间"
+          ],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "吃苦耐劳",
+          "aliases": [],
+          "dimension": "conscientiousness"
+        },
+        {
+          "name": "工作认真",
+          "aliases": [
+            "工作认真负责",
+            "认真负责"
+          ],
+          "dimension": "conscientiousness"
+        }
+      ]
+    },
+    "extraversion": {
+      "name": "外向性",
+      "skills": [
+        {
+          "name": "沟通能力",
+          "aliases": [
+            "沟通技巧",
+            "表达沟通",
+            "有效沟通",
+            "沟通表达能力",
+            "沟通协调能力",
+            "善于沟通",
+            "沟通总结能力"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "团队协作",
+          "aliases": [
+            "团队合作",
+            "协作精神",
+            "配合默契"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "领导力",
+          "aliases": [
+            "领导能力",
+            "领导才能",
+            "带队能力"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "表达能力",
+          "aliases": [
+            "语言表达",
+            "口头表达",
+            "表达清晰"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "活跃",
+          "aliases": [
+            "积极主动",
+            "热情",
+            "活泼开朗"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "外向",
+          "aliases": [
+            "性格外向",
+            "开朗",
+            "健谈"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "社交",
+          "aliases": [
+            "社交能力",
+            "社交技巧",
+            "善于交际"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "演讲",
+          "aliases": [
+            "演讲能力",
+            "公众演讲",
+            "口才好"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "谈判",
+          "aliases": [
+            "谈判能力",
+            "谈判技巧",
+            "商务谈判"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "影响力",
+          "aliases": [
+            "个人影响力",
+            "感召力",
+            "号召力"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "感染力",
+          "aliases": [
+            "情绪感染力",
+            "热情感染",
+            "鼓舞人心"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "人际交往",
+          "aliases": [
+            "人际关系",
+            "社交能力",
+            "善于交际"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "组织能力",
+          "aliases": [
+            "统筹能力",
+            "策划能力",
+            "活动组织"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "协调能力",
+          "aliases": [
+            "统筹协调",
+            "多方协调",
+            "资源协调"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "公众表达",
+          "aliases": [
+            "公开演讲",
+            "台上表达",
+            "汇报能力"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "团队精神",
+          "aliases": [
+            "团队精神",
+            "团队合作精神"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "性格开朗",
+          "aliases": [
+            "性格开朗外向",
+            "性格外向"
+          ],
+          "dimension": "extraversion"
+        },
+        {
+          "name": "组织能力",
+          "aliases": [
+            "组织协调能力"
+          ],
+          "dimension": "extraversion"
+        }
+      ]
+    },
+    "agreeableness": {
+      "name": "宜人性",
+      "skills": [
+        {
+          "name": "合作",
+          "aliases": [
+            "团队合作",
+            "配合度高",
+            "善于合作"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "同理心",
+          "aliases": [
+            "共情能力",
+            "换位思考",
+            "理解他人"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "友善",
+          "aliases": [
+            "友好",
+            "和善",
+            "待人友善"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "包容",
+          "aliases": [
+            "宽容大度",
+            "包容性强",
+            "海纳百川"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "服务意识",
+          "aliases": [
+            "服务精神",
+            "客户导向",
+            "乐于助人"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "亲和力",
+          "aliases": [
+            "亲和感",
+            "平易近人",
+            "有亲和力"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "谦虚",
+          "aliases": [
+            "谦逊",
+            "低调",
+            "虚心学习"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "信任",
+          "aliases": [
+            "值得信赖",
+            "诚信",
+            "诚实守信"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "助人",
+          "aliases": [
+            "乐于助人",
+            "热心帮助",
+            "有爱心"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "体贴",
+          "aliases": [
+            "善解人意",
+            "关心他人",
+            "细致体贴"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "谦逊",
+          "aliases": [
+            "谦虚谨慎",
+            "不骄不躁",
+            "虚心求教"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "尊重",
+          "aliases": [
+            "尊重他人",
+            "相互尊重",
+            "尊重差异"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "善解人意",
+          "aliases": [
+            "体谅他人",
+            "理解力强",
+            "感受力强"
+          ],
+          "dimension": "agreeableness"
+        },
+        {
+          "name": "换位思考",
+          "aliases": [
+            "同理心强",
+            "站在对方角度",
+            "理解对方立场"
+          ],
+          "dimension": "agreeableness"
+        }
+      ]
+    },
+    "neuroticism": {
+      "name": "情绪稳定性",
+      "skills": [
+        {
+          "name": "抗压能力",
+          "aliases": [
+            "抗压性强",
+            "能抗压",
+            "压力承受力",
+            "抗压能力强",
+            "承压能力",
+            "能承受工作压力"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "情绪管理",
+          "aliases": [
+            "情绪调节",
+            "情绪控制",
+            "管理情绪"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "冷静",
+          "aliases": [
+            "沉着冷静",
+            "临危不乱",
+            "遇事冷静"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "心理承受力",
+          "aliases": [
+            "心理素质好",
+            "心理韧性",
+            "心理强大"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "情绪稳定",
+          "aliases": [
+            "情绪平稳",
+            "心态平和",
+            "不易波动"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "韧性",
+          "aliases": [
+            "韧性强",
+            "坚韧不拔",
+            "百折不挠"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "自控力",
+          "aliases": [
+            "自我控制",
+            "克制力",
+            "自制力"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "沉着",
+          "aliases": [
+            "沉着应对",
+            "镇定自若",
+            "泰然处之"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "镇定",
+          "aliases": [
+            "镇定从容",
+            "沉着镇定",
+            "面不改色"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "心理素质",
+          "aliases": [
+            "心理素质过硬",
+            "心理过关",
+            "心态稳定"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "压力管理",
+          "aliases": [
+            "压力调节",
+            "化解压力",
+            "排解压力"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "心态好",
+          "aliases": [
+            "心态积极",
+            "乐观心态",
+            "正面心态"
+          ],
+          "dimension": "neuroticism"
+        },
+        {
+          "name": "情绪管理",
+          "aliases": [
+            "情绪管理能力"
+          ],
+          "dimension": "neuroticism"
+        }
+      ]
+    }
+  }
+}

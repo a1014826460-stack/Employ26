@@ -1,38 +1,42 @@
 # Skill Extraction
 
-`src/skill_extraction` 当前分成两套入口：
+`src/skill_extraction` 当前分成三套入口：
 
 - `v1`
   历史版，按职业细类分层维护技能词典，相关模块已收拢到 `history/`
 - `v2`
-  当前主流程，直接构造平面化职业硬技能词典，并支持自动评测、自动标注和二阶段过滤
+  前一版主流程，直接构造平面化职业硬技能词典，并支持自动评测、自动标注和二阶段过滤
+- `v3`
+  当前主流程，在 v2 基础上新增硬技能 8 类分类、软技能（大五人格）词典匹配与 LLM 验证，双管线并行输出结构化结果
 
 ## 目录说明
 
-注意：`src/skill_extraction` 的“技能词典”与 `src/job_title_parsing/occupation_dictionary_pipeline.py` 的“职业词典”是两条不同链路。
+注意：`src/skill_extraction` 的”技能词典”与 `src/job_title_parsing/occupation_dictionary_pipeline.py` 的”职业词典”是两条不同链路。
 - 技能词典：提取 JD 中的技能项
 - 职业词典：岗位名称标准化 / canonical occupation / alias 映射
 
-当前主任务优先是“技能词典提取”。
+### v2 模块
 
-- [pipeline_v1.py](/d:/PythonProjects/Employ26/src/skill_extraction/pipeline_v1.py:1)
-  `v1` 入口
-- [pipeline_v2.py](/d:/PythonProjects/Employ26/src/skill_extraction/pipeline_v2.py:1)
-  `v2` 平面词典构造入口
-- [occupation_skill_pipeline.py](/d:/PythonProjects/Employ26/src/skill_extraction/occupation_skill_pipeline.py:1)
-  `v2` 主实现
-- [match_flat_skills_to_duckdb.py](/d:/PythonProjects/Employ26/src/skill_extraction/match_flat_skills_to_duckdb.py:1)
-  平面词典匹配、LLM 抽检、上下文判别接入
-- [regression_eval.py](/d:/PythonProjects/Employ26/src/skill_extraction/regression_eval.py:1)
-  回归评测
-- [llm_label_regression_dataset.py](/d:/PythonProjects/Employ26/src/skill_extraction/llm_label_regression_dataset.py:1)
-  自动生成回归集
-- [llm_label_context_dataset.py](/d:/PythonProjects/Employ26/src/skill_extraction/llm_label_context_dataset.py:1)
-  自动生成上下文判别训练集
-- [context_classifier.py](/d:/PythonProjects/Employ26/src/skill_extraction/context_classifier.py:1)
-  多分类上下文判别器
-- [DESIGN_v2.md](/d:/PythonProjects/Employ26/src/skill_extraction/DESIGN_v2.md:1)
-  详细设计文档
+- `pipeline_v1.py` — `v1` 入口
+- `pipeline_v2.py` — `v2` 平面词典构造入口
+- `occupation_skill_pipeline.py` — `v2` 主实现
+- `match_flat_skills_to_duckdb.py` — 平面词典匹配、LLM 抽检、上下文判别接入；v3 中复用 `FlatHardSkillMatcher` 做硬技能匹配
+- `regression_eval.py` — v2 回归评测
+- `llm_label_regression_dataset.py` — 自动生成回归集
+- `llm_label_context_dataset.py` — 自动生成上下文判别训练集
+- `context_classifier.py` — 多分类上下文判别器
+- `DESIGN_v2.md` — v2 详细设计文档
+
+### v3 新增模块
+
+- `v3_pipeline.py` — V3 统一管线入口，整合硬技能和软技能双管线
+- `eval_v3.py` — V3 评估脚本，同时评估硬技能精度/召回/分类和软技能覆盖率/分类
+- `v3_result_writer.py` — PostgreSQL 结果写入模块，目标表 `public.skill_extraction_v3_results`
+- `skill_category_mapper.py` — 硬技能 8 类分类映射器（规则 + 启发式 + LLM 兜底）
+- `soft_skill_seed_extractor.py` — 从标注数据提取软技能种子词并按大五人格维度分组
+- `soft_skill_dictionary_builder.py` — 基于种子词用 LLM 扩展构建软技能词典
+- `soft_skill_matcher.py` — 软技能关键词匹配器
+- `soft_skill_llm_validator.py` — 软技能 LLM 上下文二次验证模块
 
 ## v1 运行方式
 
@@ -97,6 +101,93 @@ python -m src.skill_extraction.match_flat_skills_to_duckdb match ^
   --context-classifier-model output/skill_extraction/context_classifier/model ^
   --context-threshold 0.80
 ```
+
+## v3 运行流程
+
+### 1. 构建软技能词典（可选，已有现成词典可跳过）
+
+```bash
+# 从标注数据提取种子词
+python -m src.skill_extraction.soft_skill_seed_extractor
+
+# 用 LLM 扩展构建完整词典
+python -m src.skill_extraction.soft_skill_dictionary_builder
+```
+
+### 2. 运行 V3 管线
+
+```bash
+# 从 PostgreSQL 读取岗位描述并运行双管线
+python -m src.skill_extraction.v3_pipeline run
+
+# 启用 LLM 软技能验证（需要 vLLM 服务可用）
+python -m src.skill_extraction.v3_pipeline run --use-llm
+
+# 从 JSON 文件读取数据
+python -m src.skill_extraction.v3_pipeline process input.json --output results.json
+```
+
+### 3. 运行评估
+
+```bash
+python -m src.skill_extraction.eval_v3
+python -m src.skill_extraction.eval_v3 --fail-under-precision 0.85 --fail-under-f1 0.80
+```
+
+### 4. 为技能词典补充 category 字段（一次性）
+
+```bash
+python -m src.skill_extraction.skill_category_mapper
+```
+
+## v3 架构说明
+
+### 双管线设计
+
+V3 在 v2 硬技能匹配的基础上新增软技能管线，两条管线并行执行：
+
+1. **硬技能管线**：复用 `FlatHardSkillMatcher` 进行平面词典匹配，结果附加 8 类分类标签
+2. **软技能管线**：`SoftSkillMatcher` 关键词匹配 -> `SoftSkillLLMValidator` 上下文验证
+3. **合并去重**：同一技能名命中硬技能和软技能时，归类为硬技能（硬技能优先规则）
+
+### 硬技能 8 类分类
+
+所有硬技能词典项通过 `skill_category_mapper` 映射到以下 8 个标准类别：
+
+| 类别 | 说明 | 示例 |
+| --- | --- | --- |
+| `programming_language` | 编程语言 | Python, Java, C++ |
+| `framework` | 框架 | Spring, React, PyTorch |
+| `database` | 数据库 | MySQL, Redis, MongoDB |
+| `tool` | 工具软件 | Git, Docker, Jenkins |
+| `office` | 办公软件 | Excel, PPT, Word |
+| `equipment` | 设备/仪器 | 示波器, PLC, 万用表 |
+| `process` | 工艺方法 | 焊接, 注塑, SMT |
+| `certification` | 证书/资质 | CPA, PMP, 注册会计师 |
+
+### 软技能大五人格分类
+
+软技能按大五人格模型分为 5 个维度：
+
+| 维度 | 中文名 | 典型技能 |
+| --- | --- | --- |
+| `openness` | 开放性 | 创新、学习能力、适应力 |
+| `conscientiousness` | 尽责性 | 责任心、执行力、细心 |
+| `extraversion` | 外向性 | 沟通能力、团队协作、领导力 |
+| `agreeableness` | 宜人性 | 同理心、服务意识、合作 |
+| `neuroticism` | 情绪稳定性 | 抗压能力、情绪管理、冷静 |
+
+### 数据词典
+
+- `dicts/flat_skill_dictionary.json` — 平面化硬技能词典（1907 条，含 `category` 字段）
+- `dicts/soft_skill_dictionary.json` — 软技能词典（大五人格维度结构）
+- `dicts/skill_category_rules.json` — 硬技能类别映射规则
+
+### 结果输出
+
+- **PostgreSQL**：`public.skill_extraction_v3_results` 表
+- **JSON 文件**：通过 `--output` 参数指定路径
+- **评估报告**：`output/skill_extraction/reports/v3_eval/`
 
 ## 当前 v2 的原理
 
@@ -174,12 +265,12 @@ python3 -m src.job_title_parsing.occupation_dictionary_pipeline --pilot-size 10 
 
 - `v1` 的相关功能模块已经整体下沉到 `history/`
 - `v2` 的词典构造主逻辑保持不变，这次新增的是自动标注、回归评测和多分类上下文过滤链路
-- 更完整的设计说明见 [DESIGN_v2.md](/d:/PythonProjects/Employ26/src/skill_extraction/DESIGN_v2.md:1)
+- 更完整的设计说明见 `src/skill_extraction/DESIGN_v2.md`
 
 ## Standardized Dictionary Workflow
 
-- SOP: [SKILL_DICTIONARY_WORKFLOW_SOP.md](/D:/PythonProjects/Employ26/src/skill_extraction/SKILL_DICTIONARY_WORKFLOW_SOP.md)
-- Controller: [skill_dictionary_workflow.py](/D:/PythonProjects/Employ26/src/skill_extraction/skill_dictionary_workflow.py)
+- SOP: `src/skill_extraction/SKILL_DICTIONARY_WORKFLOW_SOP.md`
+- Controller: `src/skill_extraction/skill_dictionary_workflow.py`
 
 Recommended commands:
 
@@ -187,4 +278,27 @@ Recommended commands:
 python -m src.skill_extraction.skill_dictionary_workflow baseline
 python -m src.skill_extraction.skill_dictionary_workflow run
 python -m src.skill_extraction.skill_dictionary_workflow status
+```
+
+## 软技能迭代框架
+
+词典版本化 + 评估注册表 + CLI。每次改进创建新版本词典，运行评估，对比指标。
+
+```bash
+# 查看当前版本
+cat dicts/soft_skill/current.txt
+
+# 创建新版本
+cp dicts/soft_skill/v1.json dicts/soft_skill/v2.json
+# 编辑 v2.json ...
+echo "v2" > dicts/soft_skill/current.txt
+
+# 运行评估
+python -m src.skill_extraction.eval_cli run
+
+# 对比版本
+python -m src.skill_extraction.eval_cli compare v1 v2
+
+# 列出所有评估记录
+python -m src.skill_extraction.eval_cli list
 ```

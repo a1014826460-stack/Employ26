@@ -13,7 +13,7 @@ from typing import Dict, List
 import pandas as pd
 
 from .config import load_skill_extraction_config
-from .match_flat_skills_to_duckdb import FlatHardSkillMatcher, load_flat_dictionary
+from .hard_skill_matcher import FlatHardSkillMatcher, load_flat_dictionary
 
 
 logger = logging.getLogger(__name__)
@@ -169,9 +169,9 @@ def evaluate_regression_dataset(
     for row in dataset:
         predicted = matcher.match_text(row.text)
         predicted_keys = {
-            _normalize_skill_name(item, skill_name_normalizer): skill_name_normalizer.get(
-                _safe_text(item).casefold(),
-                item,
+            _normalize_skill_name(item["skill_name"], skill_name_normalizer): skill_name_normalizer.get(
+                _safe_text(item["skill_name"]).casefold(),
+                item["skill_name"],
             )
             for item in predicted
         }
