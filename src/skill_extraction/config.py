@@ -95,6 +95,9 @@ class SkillExtractionConfig:
     catalog_preprocessed_table: str
     jobs_tables: List[str]
     requirement_match_table: str
+    occupation_detail_match_table: str
+    occupation_detail_model_path: Path
+    occupation_detail_top_k: int
     recruitment_normalized_table: str
     output_dir: Path
     prompt_train_dir: Path
@@ -247,6 +250,21 @@ def load_skill_extraction_config(
                 "public.skill_extraction_requirement_matches",
             )
         ),
+        occupation_detail_match_table=qualify_table_name(
+            skill_settings.get(
+                "occupation_detail_match_table",
+                raw_config.get("tables", {}).get("processing_results", {}).get(
+                    "occupation_detail_matches",
+                    "public.occupation_detail_matches",
+                ),
+            )
+        ),
+        occupation_detail_model_path=PROJECT_ROOT
+        / skill_settings.get(
+            "occupation_detail_model_path",
+            "output/penghui/rag_round2_training/bge-large-round2-finetuned",
+        ),
+        occupation_detail_top_k=max(1, int(skill_settings.get("occupation_detail_top_k", 10))),
         recruitment_normalized_table=qualify_table_name(
             raw_config.get("tables", {}).get("processing_results", {}).get(
                 "recruitment_jobs_normalized",

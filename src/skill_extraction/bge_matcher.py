@@ -11,14 +11,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-from pathlib import Path
 from typing import Dict, List
 
 import duckdb
 import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
+from sqlalchemy import text
 
+from src.db.postgres import create_pg_engine
+from src.db.recruitment_jobs_normalized import quote_table_name
 from .config import SkillExtractionConfig
 
 
@@ -89,10 +91,11 @@ class OccupationBGEMatcher:
 
     def load_catalog(self) -> pd.DataFrame:
         """加载职业目录，并仅保留可映射到细类的记录。"""
+        qualified_table = quote_table_name(self.config.catalog_preprocessed_table)
         query = f"""
             SELECT
-                code,
-                title,
+                COALESCE(code, "职业代码", node_key, '') AS code,
+                COALESCE(title, "细类", "小类", "中类", "大类", '') AS title,
                 "desc" AS desc,
                 tasks,
                 "大类" AS 大类,
@@ -103,11 +106,20 @@ class OccupationBGEMatcher:
                 title_clean,
                 desc_clean,
                 hierarchy_text
-            FROM {self.config.catalog_preprocessed_table}
+            FROM {qualified_table}
         """
-        with duckdb.connect(str(self.config.db_path)) as conn:
-            conn.execute(f"PRAGMA threads={self.config.duckdb_threads}")
-            catalog_df = conn.execute(query).df()
+        engine = create_pg_engine(application_name="occupation_bge_catalog")
+        try:
+            with engine.connect() as connection:
+                catalog_df = pd.read_sql_query(text(query), connection)
+        except Exception as exc:
+            logger.warning("从 PostgreSQL 加载职业目录失败，回退 DuckDB: %s", exc)
+            duckdb_query = query.replace(qualified_table, self.config.catalog_preprocessed_table)
+            with duckdb.connect(str(self.config.db_path)) as conn:
+                conn.execute(f"PRAGMA threads={self.config.duckdb_threads}")
+                catalog_df = conn.execute(duckdb_query).df()
+        finally:
+            engine.dispose()
 
         if catalog_df.empty:
             raise ValueError("职业目录表为空，无法进行职业细类匹配")

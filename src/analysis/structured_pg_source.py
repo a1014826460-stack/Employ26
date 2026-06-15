@@ -68,7 +68,11 @@ def load_default_structured_source_config() -> StructuredSourceConfig:
     skill_config = load_skill_extraction_config()
     return StructuredSourceConfig(
         normalized_table=skill_config.recruitment_normalized_table,
-        occupation_match_table=skill_config.requirement_match_table,
+        occupation_match_table=getattr(
+            skill_config,
+            "occupation_detail_match_table",
+            skill_config.requirement_match_table,
+        ),
     )
 
 

@@ -69,6 +69,7 @@ tables:
     match_training_features: public.match_training_features
     rag_match_results_v2: public.rag_match_results_v2
     skill_extraction_requirement_matches: public.skill_extraction_requirement_matches
+    occupation_detail_matches: public.occupation_detail_matches
     job_match_results: public.job_match_results
     jd_raw: public.jd_raw
     skill_extraction_v3_results: public.skill_extraction_v3_results
@@ -85,6 +86,9 @@ job_title_parsing:
 
 skill_extraction:
   requirement_match_table: public.skill_extraction_requirement_matches
+  occupation_detail_match_table: public.occupation_detail_matches
+  occupation_detail_model_path: output/penghui/rag_round2_training/bge-large-round2-finetuned
+  occupation_detail_top_k: 10
   llm_base_url: https://api.ofox.ai/v1
   llm_env_file: .env.local
 

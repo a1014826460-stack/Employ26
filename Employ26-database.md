@@ -909,6 +909,48 @@ join public.jd_raw j
 - 当前活跃公共链路应以 `recruitment_record_id` 作为标准引用字段
 - `source_table` / `source_row_number` 仅用于来源回溯
 
+##### `public.occupation_detail_matches`
+
+- 用途：全量招聘记录的正式职业细类识别结果层
+- 主键：`recruitment_record_id`
+- 输入来源：`public.recruitment_jobs_normalized`
+- 默认模型：`output/penghui/rag_round2_training/bge-large-round2-finetuned`
+- 检索策略：底层保留 Top10，默认职业输出取 Top1
+
+关键字段：
+
+- `recruitment_record_id`
+- `source_platform`
+- `source_table`
+- `source_row_number`
+- `job_title`
+- `query_text`
+- `query_source`
+- `occupation_code`
+- `occupation_title`
+- `大类`
+- `中类`
+- `小类`
+- `细类`
+- `top1_score`
+- `is_matched`
+- `selected_candidate_rank`
+- `top_k`
+- `top10_candidates` (`jsonb`)
+- `model_recipe`
+- `base_model`
+- `model_path`
+- `run_id`
+- `created_at`
+- `updated_at`
+
+说明：
+
+- 这张表是后续结构化统计默认读取的职业识别结果层。
+- `occupation_code` / `occupation_title` 固定表示 Top1 结果。
+- `top10_candidates` 用于人工复核、误差分析和后续 rerank，不改变默认输出口径。
+- `public.skill_extraction_requirement_matches` 保留为旧的任职要求切分与技能抽取预处理结果表，不再承担 1052 万行全量职业识别结果层职责。
+
 ##### `public.hard_skill_match_results_dev`
 
 - 近似行数：`103,938`
@@ -1286,6 +1328,15 @@ on public.skill_extraction_requirement_matches (occupation_code);
 
 create index if not exists idx_skill_req_matches_top1_code
 on public.skill_extraction_requirement_matches (top1_code);
+
+create index if not exists idx_occupation_detail_matches_occupation_code
+on public.occupation_detail_matches (occupation_code);
+
+create index if not exists idx_occupation_detail_matches_is_matched
+on public.occupation_detail_matches (is_matched);
+
+create index if not exists idx_occupation_detail_matches_updated_at
+on public.occupation_detail_matches (updated_at);
 ```
 
 #### 原始 JD 回溯

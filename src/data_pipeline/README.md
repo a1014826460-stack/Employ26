@@ -167,6 +167,40 @@ python -m src.data_pipeline.requirement_match_prep --parse-workers 4 --parse-bat
 
 注意：该脚本写表时使用 `if_exists='replace'`，会替换目标匹配结果表。
 
+### `occupation_detail_match_full.py`
+
+全量职业细类识别脚本。它从 `public.recruitment_jobs_normalized` 分批读取招聘记录，使用当前最佳 `v1 + bge-large` finetuned 模型检索职业细类，底层保留 Top10 候选，默认结果字段仍取 Top1，并写入 `public.occupation_detail_matches`。
+
+试跑 1000 行：
+
+```bash
+python -m src.data_pipeline.occupation_detail_match_full --limit-rows 1000 --batch-size 1000
+```
+
+正式断点续跑：
+
+```bash
+python -m src.data_pipeline.occupation_detail_match_full --batch-size 20000
+```
+
+强制重算覆盖已有结果：
+
+```bash
+python -m src.data_pipeline.occupation_detail_match_full --batch-size 20000 --no-resume
+```
+
+默认配置来自 `config/database.yaml`：
+
+- `skill_extraction.occupation_detail_match_table`
+- `skill_extraction.occupation_detail_model_path`
+- `skill_extraction.occupation_detail_top_k`
+
+说明：
+
+- 该脚本不会覆盖 `public.skill_extraction_requirement_matches`。
+- `public.occupation_detail_matches.occupation_code` / `occupation_title` 固定表示 Top1 最终输出。
+- `public.occupation_detail_matches.top10_candidates` 保存 Top10 候选，用于人工复核、误差分析或后续 rerank。
+
 ### `occupation_integration.py`
 
 历史 CSV 整合适配器。读取旧的 NLP 处理 CSV 和职业解析 CSV，生成带职业字段、月份、城市、行业标准化字段的 `output/integrated/*_整合_*.csv`。

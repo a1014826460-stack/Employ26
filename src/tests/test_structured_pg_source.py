@@ -4,6 +4,7 @@ from src.analysis.structured_pg_source import (
     StructuredSourceConfig,
     build_structured_source_coverage,
     build_structured_source_query,
+    load_default_structured_source_config,
     normalize_structured_source_dataframe,
 )
 
@@ -113,3 +114,21 @@ def test_build_structured_source_coverage_uses_source_locator_mapping(monkeypatc
     assert coverage["matched_rows"] == 80
     assert coverage["matched_share"] == 0.8
     assert coverage["match_join_key"] == "__source_table+__source_row_number(mapped)"
+
+
+class _FakeSkillConfig:
+    recruitment_normalized_table = "public.recruitment_jobs_normalized"
+    requirement_match_table = "public.skill_extraction_requirement_matches"
+    occupation_detail_match_table = "public.occupation_detail_matches"
+
+
+def test_structured_source_prefers_occupation_detail_match_table(monkeypatch):
+    monkeypatch.setattr(
+        "src.analysis.structured_pg_source.load_skill_extraction_config",
+        lambda: _FakeSkillConfig(),
+    )
+
+    config = load_default_structured_source_config()
+
+    assert config.normalized_table == "public.recruitment_jobs_normalized"
+    assert config.occupation_match_table == "public.occupation_detail_matches"
