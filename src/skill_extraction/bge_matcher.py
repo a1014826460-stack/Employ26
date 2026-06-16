@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import re
 from typing import Dict, List
 
 import duckdb
@@ -37,14 +38,22 @@ def _safe_text(value: object) -> str:
     return text
 
 
+def _format_occupation_code(value: object) -> str:
+    """Format 7-digit occupation codes as x-xx-xx-xx when possible."""
+    text = _safe_text(value)
+    digits = re.sub(r"\D", "", text)
+    if len(digits) == 7:
+        return f"{digits[0]}-{digits[1:3]}-{digits[3:5]}-{digits[5:7]}"
+    return text
+
+
 def _build_catalog_search_text(row: pd.Series) -> str:
     """构造职业细类向量检索文本。"""
     parts = [
         _safe_text(row.get("大类", "")),
         _safe_text(row.get("中类", "")),
         _safe_text(row.get("小类", "")),
-        _safe_text(row.get("细类", "")),
-        _safe_text(row.get("title_clean", "")) or _safe_text(row.get("title", "")),
+        _safe_text(row.get("title", "")) or _safe_text(row.get("title_clean", "")),
         _safe_text(row.get("desc_clean", "")) or _safe_text(row.get("desc", "")),
         _safe_text(row.get("task_text_joined", "")) or _safe_text(row.get("tasks", "")),
     ]
@@ -94,8 +103,8 @@ class OccupationBGEMatcher:
         qualified_table = quote_table_name(self.config.catalog_preprocessed_table)
         query = f"""
             SELECT
-                COALESCE(code, "职业代码", node_key, '') AS code,
-                COALESCE(title, "细类", "小类", "中类", "大类", '') AS title,
+                code,
+                title,
                 "desc" AS desc,
                 tasks,
                 "大类" AS 大类,
@@ -107,6 +116,7 @@ class OccupationBGEMatcher:
                 desc_clean,
                 hierarchy_text
             FROM {qualified_table}
+            WHERE node_type = 'occupation_leaf'
         """
         engine = create_pg_engine(application_name="occupation_bge_catalog")
         try:
@@ -125,11 +135,15 @@ class OccupationBGEMatcher:
             raise ValueError("职业目录表为空，无法进行职业细类匹配")
 
         work_df = catalog_df.copy()
-        work_df["细类"] = work_df["细类"].fillna("").astype(str).str.strip()
-        work_df = work_df[work_df["细类"] != ""].copy()
+        work_df["code"] = work_df["code"].map(_format_occupation_code)
+        work_df["title"] = work_df["title"].fillna("").astype(str).str.strip()
+        work_df = work_df[(work_df["code"] != "") & (work_df["title"] != "")].copy()
         if work_df.empty:
             raise ValueError("职业目录中没有可用的职业细类记录")
 
+        # The unified catalog can contain inconsistent hierarchy detail fields.
+        # For occupation leaves, code/title are the canonical fine-grained label.
+        work_df["细类"] = work_df["title"]
         work_df["detail_path"] = (
             work_df[["大类", "中类", "小类", "细类"]]
             .fillna("")

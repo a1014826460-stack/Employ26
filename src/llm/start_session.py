@@ -16,7 +16,7 @@ from typing import Any
 
 # 运行方式：从项目根目录执行 `python -m src.llm.start_session`，
 # 确保 src.* 包可通过标准 Python 模块搜索路径正确导入。
-from ..utils.utils import safe_print  # noqa: E402
+from ..utils.utils import PROJECT_ROOT, safe_print  # noqa: E402
 from ..utils.vllm_utils import (  # noqa: E402
     DEFAULT_VLLM_CONFIG_PATH,
     chat_completion,

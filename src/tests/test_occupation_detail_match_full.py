@@ -6,6 +6,7 @@ from src.data_pipeline.occupation_detail_match_full import (
     DEFAULT_BASE_MODEL,
     DEFAULT_MODEL_RECIPE,
     DEFAULT_TOP_K,
+    _build_catalog_cache_path,
     build_match_input_dataframe,
     build_unmatched_batch_query,
     resolve_runtime_defaults,
@@ -75,3 +76,15 @@ def test_resolve_runtime_defaults_uses_config_when_args_are_empty():
     assert defaults["target_table"] == "public.occupation_detail_matches"
     assert defaults["top_k"] == 10
     assert defaults["model_path"].endswith("bge-large-round2-finetuned")
+
+
+def test_build_catalog_cache_path_versions_canonical_catalog_embeddings():
+    cache_path = _build_catalog_cache_path(
+        Path("output/cache"),
+        "output/penghui/rag_round2_training/bge-large-round2-finetuned",
+    )
+
+    assert cache_path.name == (
+        "occupation_catalog_embeddings_occupation-detail-v4-canonical-pro_"
+        "bge-large-round2-finetuned.npy"
+    )

@@ -36,6 +36,7 @@ DEFAULT_TOP_K = 10
 DEFAULT_MODEL_RECIPE = "v1"
 DEFAULT_BASE_MODEL = "bge-large-zh-v1.5"
 DEFAULT_MODEL_PATH = "output/penghui/rag_round2_training/bge-large-round2-finetuned"
+CATALOG_CACHE_VERSION = "occupation-detail-v4-canonical-pro"
 
 
 def resolve_runtime_defaults(config) -> dict[str, object]:
@@ -146,7 +147,7 @@ def _build_catalog_cache_path(cache_dir: Path, model_path: str | Path) -> Path:
     """Build a model-specific catalog embedding cache path."""
     model_name = Path(str(model_path)).name or "occupation_detail_model"
     safe_name = "".join(char if char.isalnum() or char in ("-", "_") else "_" for char in model_name)
-    return cache_dir / f"occupation_catalog_embeddings_{safe_name}.npy"
+    return cache_dir / f"occupation_catalog_embeddings_{CATALOG_CACHE_VERSION}_{safe_name}.npy"
 
 
 def run_full_occupation_detail_matching(

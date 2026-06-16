@@ -42,7 +42,7 @@
 
 ### 职业词典
 
-- 表：`public.occ_dict_detailed`
+- 表：`public.occ_dict_unified`
 - 关键字段：
   - `code`
   - `title`
