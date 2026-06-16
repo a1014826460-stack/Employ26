@@ -2,7 +2,7 @@
 import json
 import pytest
 from pathlib import Path
-from src.skill_extraction.eval_cli import build_parser, cmd_list
+from src.skill_extraction.evaluation.cli import build_parser, cmd_list
 
 
 SAMPLE_RECORD = {
@@ -50,7 +50,7 @@ class TestBuildParser:
 
 class TestCmdList:
     def test_empty_registry(self, tmp_path, capsys):
-        from src.skill_extraction._eval_registry import load_registry
+        from src.skill_extraction.evaluation.registry import load_registry
         load_registry(tmp_path)  # create empty registry
         cmd_list(tmp_path)
         captured = capsys.readouterr()
@@ -60,7 +60,7 @@ class TestCmdList:
 class TestCmdRun:
     def test_run_creates_registry_record(self, tmp_path, monkeypatch):
         import json
-        from src.skill_extraction.eval_cli import cmd_run
+        from src.skill_extraction.evaluation.cli import cmd_run
 
         gold_dir = tmp_path / "gold"
         gold_dir.mkdir()
@@ -111,8 +111,8 @@ class TestCmdRun:
 
 class TestCmdCompare:
     def test_compare_shows_delta(self, tmp_path, capsys):
-        from src.skill_extraction._eval_registry import append_eval_record
-        from src.skill_extraction.eval_cli import cmd_compare
+        from src.skill_extraction.evaluation.registry import append_eval_record
+        from src.skill_extraction.evaluation.cli import cmd_compare
 
         record_v1 = {
             "dict_version": "v1",
@@ -141,7 +141,7 @@ class TestCmdCompare:
         assert "v2" in captured.out
 
     def test_compare_missing_version(self, tmp_path, capsys):
-        from src.skill_extraction.eval_cli import cmd_compare
+        from src.skill_extraction.evaluation.cli import cmd_compare
 
         cmd_compare("v1", "v99", eval_dir=tmp_path)
         captured = capsys.readouterr()

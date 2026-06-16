@@ -35,7 +35,7 @@ logging.basicConfig(
 DEFAULT_TOP_K = 10
 DEFAULT_MODEL_RECIPE = "v1"
 DEFAULT_BASE_MODEL = "bge-large-zh-v1.5"
-DEFAULT_MODEL_PATH = "output/penghui/rag_round2_training/bge-large-round2-finetuned"
+DEFAULT_MODEL_PATH = "output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned"
 CATALOG_CACHE_VERSION = "occupation-detail-v4-canonical-pro"
 
 
@@ -286,3 +286,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

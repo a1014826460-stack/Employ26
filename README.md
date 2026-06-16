@@ -70,7 +70,7 @@ $env:EMPLOYDATA_PG_PASSWORD="your_password"
 python -m src.job_title_parsing.cli match --progress
 
 # 技能抽取
-python -m src.skill_extraction.occupation_skill_pipeline --help
+python -m src.skill_extraction.cli --help
 
 # RAG 检索
 python -m src.rag.cli query --title "Java开发工程师" --requirements "Spring..."
@@ -131,7 +131,7 @@ python -m src.job_title_parsing.cli evaluate
 ### 技能抽取
 
 ```bash
-python -m src.skill_extraction.occupation_skill_pipeline --help
+python -m src.skill_extraction.cli --help
 ```
 
 ### RAG

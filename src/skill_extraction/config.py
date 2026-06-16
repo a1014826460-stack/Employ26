@@ -22,7 +22,7 @@ from src.utils.llm_router import (
     DEFAULT_STRONG_MODEL,
 )
 
-from src.job_title_parsing.match_utils import load_database_config
+from src.utils.utils import load_database_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -262,7 +262,7 @@ def load_skill_extraction_config(
         occupation_detail_model_path=PROJECT_ROOT
         / skill_settings.get(
             "occupation_detail_model_path",
-            "output/penghui/rag_round2_training/bge-large-round2-finetuned",
+            "output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned",
         ),
         occupation_detail_top_k=max(1, int(skill_settings.get("occupation_detail_top_k", 10))),
         recruitment_normalized_table=qualify_table_name(
@@ -287,3 +287,4 @@ def load_skill_extraction_config(
     )
     config.ensure_dirs()
     return config
+

@@ -16,7 +16,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from src.skill_extraction.skill_category_mapper import (
+from src.skill_extraction.hard.category_mapper import (
     VALID_CATEGORIES,
     _default_rules_path,
     apply_categories_to_dictionary,
@@ -434,9 +434,7 @@ class TestFlatHardSkillMatcherCategory:
 
     def _make_matcher(self):
         """创建测试用匹配器实例。"""
-        from src.skill_extraction.match_flat_skills_to_duckdb import (
-            FlatHardSkillMatcher,
-        )
+        from src.skill_extraction.hard.matcher import FlatHardSkillMatcher
 
         return FlatHardSkillMatcher(MATCHER_TEST_DICT)
 

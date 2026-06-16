@@ -75,7 +75,7 @@ def test_build_occupation_detail_match_records_uses_top1_as_final_output():
         run_id="test-run",
         model_recipe="v1",
         base_model="bge-large-zh-v1.5",
-        model_path="output/penghui/rag_round2_training/bge-large-round2-finetuned",
+        model_path="output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned",
         top_k=10,
     )
 
@@ -88,3 +88,4 @@ def test_build_occupation_detail_match_records_uses_top1_as_final_output():
     assert record["selected_candidate_rank"] == 1
     assert record["top_k"] == 10
     assert json.loads(record["top10_candidates"])[0]["rank"] == 1
+

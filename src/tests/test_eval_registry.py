@@ -1,7 +1,7 @@
 """测试评估注册表读写。"""
 import json
 from pathlib import Path
-from src.skill_extraction._eval_registry import (
+from src.skill_extraction.evaluation.registry import (
     load_registry,
     append_eval_record,
     get_record_by_version,

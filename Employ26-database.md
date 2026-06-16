@@ -914,7 +914,7 @@ join public.jd_raw j
 - 用途：全量招聘记录的正式职业细类识别结果层
 - 主键：`recruitment_record_id`
 - 输入来源：`public.recruitment_jobs_normalized`
-- 默认模型：`output/penghui/rag_round2_training/bge-large-round2-finetuned`
+- 默认模型：`output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned`
 - 检索策略：底层保留 Top10，默认职业输出取 Top1
 
 关键字段：
@@ -984,7 +984,7 @@ join public.jd_raw j
 
 - 用途：V3 统一技能抽取管线输出表，同时存储硬技能和软技能结果
 - 定位：V3 管线的正式结果表，替代 `skill_extraction_requirement_matches` 作为新流程入口
-- 写入模块：`src.skill_extraction.v3_result_writer`
+- 写入模块：`src.skill_extraction.pipeline.writer`
 - 唯一键：`recruitment_record_id`
 - 配置键：`config/database.yaml` 中 `tables.skill_extraction_v3_results`
 
@@ -1398,3 +1398,4 @@ on public.jd_raw (row_id);
 3. 统一任务链路和职业 code 链路的引用方式
 4. 逐步把其他高频 JSON 文本字段迁移到 `jsonb`
 5. 将招聘主数据收敛到英文列名的统一规范层，并把岗位描述解析结果沉淀到 `public.job_description_parsed`
+

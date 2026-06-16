@@ -153,8 +153,9 @@ tasks_table = paths.get_table_name("annotations", "tasks_v2")
 ### 技能抽取
 
 - 目录: `src/skill_extraction/`
-- 主入口: `python -m src.skill_extraction.occupation_skill_pipeline`
-- 统一配置入口: `load_skill_extraction_config()`
+- 主入口: `python -m src.skill_extraction.cli`
+- 统一配置入口: `config.paths.get_project_paths()`
+- 正式结果表: `public.skill_extraction_v3_results`
 - 目标倾向: 高精度、低噪声，避免把软素质、职责套话、福利词误识别为技能
 
 ### 数据准备流水线
@@ -194,7 +195,7 @@ tasks_table = paths.get_table_name("annotations", "tasks_v2")
 
 ```bash
 python -m src.job_title_parsing.cli match --progress
-python -m src.skill_extraction.occupation_skill_pipeline --help
+python -m src.skill_extraction.cli --help
 python -m src.rag.cli query --title "Java开发工程师" --requirements "Spring..."
 python -m src.bge.step_01_deduplicate
 ```

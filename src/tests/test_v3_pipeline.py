@@ -20,20 +20,20 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from src.skill_extraction.v3_pipeline import (
+from src.skill_extraction.pipeline.pipeline import (
     RecordResult,
     V3Pipeline,
     _get_match_text,
     _merge_deduplicate,
     _safe_text,
 )
-from src.skill_extraction.v3_result_writer import (
+from src.skill_extraction.pipeline.writer import (
     _prepare_row,
     create_v3_results_table,
     write_v3_results,
 )
 
-from src.skill_extraction.eval_v3 import (
+from src.skill_extraction.evaluation.v3 import (
     HardSkillMetrics,
     HardSkillSample,
     SoftSkillMetrics,
@@ -137,8 +137,10 @@ class TestRecordResult:
         keys = set(result.to_dict().keys())
         expected = {
             "recruitment_record_id", "job_title",
+            "source_table", "source_row_number",
             "hard_skills", "hard_skill_count",
             "soft_skills", "soft_skill_count",
+            "pipeline_version",
         }
         assert keys == expected
 
@@ -1089,7 +1091,7 @@ class TestPrepareRow:
 class TestCreateV3ResultsTable:
     """测试 create_v3_results_table 表创建逻辑（mock PostgreSQL）。"""
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_creates_table_and_indexes(self, mock_get_conn):
         """应执行建表和建索引的 SQL 语句。"""
         mock_conn = MagicMock()
@@ -1113,7 +1115,7 @@ class TestCreateV3ResultsTable:
         assert any("idx_v3_results_hard_skills" in sql for sql in executed_sqls)
         assert any("idx_v3_results_soft_skills" in sql for sql in executed_sqls)
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_rollback_on_error(self, mock_get_conn):
         """出错时应 rollback 并抛出异常。"""
         mock_conn = MagicMock()
@@ -1129,7 +1131,7 @@ class TestCreateV3ResultsTable:
         mock_conn.rollback.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_accepts_custom_pg_params(self, mock_get_conn):
         """应将自定义 pg_params 传递给 _get_connection。"""
         mock_conn = MagicMock()
@@ -1150,7 +1152,7 @@ class TestCreateV3ResultsTable:
 class TestWriteV3Results:
     """测试 write_v3_results 批量写入逻辑（mock PostgreSQL）。"""
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_writes_single_result(self, mock_get_conn):
         """应正确写入单条结果。"""
         mock_conn = MagicMock()
@@ -1177,7 +1179,7 @@ class TestWriteV3Results:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_writes_multiple_results(self, mock_get_conn):
         """应正确写入多条结果。"""
         mock_conn = MagicMock()
@@ -1196,7 +1198,7 @@ class TestWriteV3Results:
         assert count == 10
         assert mock_cursor.execute.call_count == 10
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_batch_commit(self, mock_get_conn):
         """应按 batch_size 分批提交。"""
         mock_conn = MagicMock()
@@ -1216,7 +1218,7 @@ class TestWriteV3Results:
         assert count == 10
         assert mock_conn.commit.call_count == 4
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_empty_results_returns_zero(self, mock_get_conn):
         """空结果列表应返回 0 且不连接数据库。"""
         count = write_v3_results([])
@@ -1224,7 +1226,7 @@ class TestWriteV3Results:
         assert count == 0
         mock_get_conn.assert_not_called()
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_rollback_on_error(self, mock_get_conn):
         """出错时应 rollback。"""
         mock_conn = MagicMock()
@@ -1240,7 +1242,7 @@ class TestWriteV3Results:
         mock_conn.rollback.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    @patch("src.skill_extraction.v3_result_writer._get_connection")
+    @patch("src.skill_extraction.pipeline.writer._get_connection")
     def test_upsert_sql_contains_on_conflict(self, mock_get_conn):
         """SQL 应包含 ON CONFLICT 子句实现 upsert。"""
         mock_conn = MagicMock()

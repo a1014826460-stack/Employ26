@@ -65,7 +65,7 @@ def test_build_unmatched_batch_query_can_use_record_id_cursor():
 class _FakeConfig:
     recruitment_normalized_table = "public.recruitment_jobs_normalized"
     occupation_detail_match_table = "public.occupation_detail_matches"
-    occupation_detail_model_path = Path("output/penghui/rag_round2_training/bge-large-round2-finetuned")
+    occupation_detail_model_path = Path("output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned")
     occupation_detail_top_k = 10
 
 
@@ -81,10 +81,11 @@ def test_resolve_runtime_defaults_uses_config_when_args_are_empty():
 def test_build_catalog_cache_path_versions_canonical_catalog_embeddings():
     cache_path = _build_catalog_cache_path(
         Path("output/cache"),
-        "output/penghui/rag_round2_training/bge-large-round2-finetuned",
+        "output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned",
     )
 
     assert cache_path.name == (
         "occupation_catalog_embeddings_occupation-detail-v4-canonical-pro_"
         "bge-large-round2-finetuned.npy"
     )
+

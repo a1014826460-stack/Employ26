@@ -223,7 +223,7 @@ def init_labeling_llm(
         return None
 
     try:
-        from src.skill_extraction.merge_similar_skills import init_vllm_engine
+        from src.skill_extraction.dictionary.merge import init_vllm_engine
     except Exception as exc:  # noqa: BLE001
         logger.warning("Skipping local LLM init because vLLM import failed: %s", exc)
         return None

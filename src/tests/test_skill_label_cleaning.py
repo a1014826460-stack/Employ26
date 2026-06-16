@@ -1,4 +1,4 @@
-from src.skill_extraction.llm_label_regression_dataset import _clean_skill_item
+from src.skill_extraction.labeling.regression_dataset import _clean_skill_item
 
 
 def test_clean_skill_item_drops_generic_container_skill():

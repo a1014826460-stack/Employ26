@@ -1,5 +1,9 @@
 # Skill Extraction V2 设计文档
 
+> 历史说明：本文档仅记录 V2 / DuckDB 时期的设计背景，不再作为当前实现入口。
+> 当前主线请以 `src/skill_extraction/README.md` 和
+> `python -m src.skill_extraction.cli --help` 为准。
+
 ## 1. 目标
 
 `src/skill_extraction` 的 v2 流程面向两个核心目标：
@@ -92,7 +96,7 @@ python -m src.skill_extraction.pipeline_v2
 入口：
 
 ```bash
-python -m src.skill_extraction.llm_label_regression_dataset ^
+python -m src.skill_extraction.labeling.regression_dataset ^
   --sample-size 400 ^
   --num-votes 3
 ```
@@ -124,7 +128,7 @@ python -m src.skill_extraction.llm_label_regression_dataset ^
 入口：
 
 ```bash
-python -m src.skill_extraction.llm_label_context_dataset ^
+python -m src.skill_extraction.labeling.context_dataset ^
   --regression-dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl ^
   --dictionary dicts/flat_skill_dictionary.json ^
   --num-votes 3
@@ -164,7 +168,7 @@ python -m src.skill_extraction.llm_label_context_dataset ^
 入口：
 
 ```bash
-python -m src.skill_extraction.context_classifier train ^
+python -m src.skill_extraction.hard.context_classifier train ^
   --dataset output/skill_extraction/context_classifier/context_dataset_llm.jsonl ^
   --output-dir output/skill_extraction/context_classifier/model
 ```
@@ -275,20 +279,20 @@ python -m src.skill_extraction.match_flat_skills_to_duckdb match ^
 
 ```bash
 python -m src.skill_extraction.pipeline_v2
-python -m src.skill_extraction.llm_label_regression_dataset --sample-size 400 --num-votes 3
-python -m src.skill_extraction.llm_label_context_dataset --regression-dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --num-votes 3
-python -m src.skill_extraction.context_classifier train --dataset output/skill_extraction/context_classifier/context_dataset_llm.jsonl --output-dir output/skill_extraction/context_classifier/model
-python -m src.skill_extraction.regression_eval --dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --fail-under-precision 0.90 --fail-under-f1 0.80
+python -m src.skill_extraction.labeling.regression_dataset --sample-size 400 --num-votes 3
+python -m src.skill_extraction.labeling.context_dataset --regression-dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --num-votes 3
+python -m src.skill_extraction.hard.context_classifier train --dataset output/skill_extraction/context_classifier/context_dataset_llm.jsonl --output-dir output/skill_extraction/context_classifier/model
+python -m src.skill_extraction.evaluation.regression --dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --fail-under-precision 0.90 --fail-under-f1 0.80
 python -m src.skill_extraction.match_flat_skills_to_duckdb match --dictionary dicts/flat_skill_dictionary.json --context-classifier-model output/skill_extraction/context_classifier/model
 ```
 
 ### 7.2 周期性增量更新
 
 ```bash
-python -m src.skill_extraction.llm_label_regression_dataset --sample-size 200 --num-votes 3
-python -m src.skill_extraction.llm_label_context_dataset --regression-dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --num-votes 3
-python -m src.skill_extraction.context_classifier train --dataset output/skill_extraction/context_classifier/context_dataset_llm.jsonl --output-dir output/skill_extraction/context_classifier/model_next
-python -m src.skill_extraction.regression_eval --dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --fail-under-precision 0.90 --fail-under-f1 0.80
+python -m src.skill_extraction.labeling.regression_dataset --sample-size 200 --num-votes 3
+python -m src.skill_extraction.labeling.context_dataset --regression-dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --num-votes 3
+python -m src.skill_extraction.hard.context_classifier train --dataset output/skill_extraction/context_classifier/context_dataset_llm.jsonl --output-dir output/skill_extraction/context_classifier/model_next
+python -m src.skill_extraction.evaluation.regression --dataset output/skill_extraction/regression/flat_skill_regression_dataset.jsonl --dictionary dicts/flat_skill_dictionary.json --fail-under-precision 0.90 --fail-under-f1 0.80
 ```
 
 ## 8. 已知局限

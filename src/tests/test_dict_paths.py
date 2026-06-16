@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.skill_extraction._dict_paths import (
+from src.skill_extraction.core.dict_paths import (
     get_current_soft_skill_dict_path,
     get_soft_skill_dict_path_for_version,
     list_soft_skill_dict_versions,
@@ -17,7 +17,7 @@ def test_get_current_soft_skill_dict_path(tmp_path, monkeypatch):
     (dict_dir / "v1.json").write_text('{"version": "v1"}')
 
     monkeypatch.setattr(
-        "src.skill_extraction._dict_paths._SOFT_SKILL_DICT_DIR",
+        "src.skill_extraction.core.dict_paths._SOFT_SKILL_DICT_DIR",
         dict_dir,
     )
     result = get_current_soft_skill_dict_path()
@@ -30,7 +30,7 @@ def test_get_soft_skill_dict_path_for_version(tmp_path, monkeypatch):
     dict_dir.mkdir()
 
     monkeypatch.setattr(
-        "src.skill_extraction._dict_paths._SOFT_SKILL_DICT_DIR",
+        "src.skill_extraction.core.dict_paths._SOFT_SKILL_DICT_DIR",
         dict_dir,
     )
     result = get_soft_skill_dict_path_for_version("v3")
@@ -47,7 +47,7 @@ def test_list_soft_skill_dict_versions(tmp_path, monkeypatch):
     (dict_dir / "README.md").touch()
 
     monkeypatch.setattr(
-        "src.skill_extraction._dict_paths._SOFT_SKILL_DICT_DIR",
+        "src.skill_extraction.core.dict_paths._SOFT_SKILL_DICT_DIR",
         dict_dir,
     )
     versions = list_soft_skill_dict_versions()
@@ -60,7 +60,7 @@ def test_get_current_soft_skill_dict_path_missing_current_txt(tmp_path, monkeypa
     dict_dir.mkdir()
 
     monkeypatch.setattr(
-        "src.skill_extraction._dict_paths._SOFT_SKILL_DICT_DIR",
+        "src.skill_extraction.core.dict_paths._SOFT_SKILL_DICT_DIR",
         dict_dir,
     )
     with pytest.raises(FileNotFoundError, match="current.txt"):
@@ -74,7 +74,7 @@ def test_get_current_soft_skill_dict_path_missing_version_file(tmp_path, monkeyp
     (dict_dir / "current.txt").write_text("v99")
 
     monkeypatch.setattr(
-        "src.skill_extraction._dict_paths._SOFT_SKILL_DICT_DIR",
+        "src.skill_extraction.core.dict_paths._SOFT_SKILL_DICT_DIR",
         dict_dir,
     )
     with pytest.raises(FileNotFoundError, match="v99"):

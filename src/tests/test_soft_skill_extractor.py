@@ -21,7 +21,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from src.skill_extraction.soft_skill_seed_extractor import (
+from src.skill_extraction.soft.seed_extractor import (
     DIMENSION_KEYWORDS,
     MIN_FREQUENCY,
     _build_fallback_seeds,
@@ -29,7 +29,7 @@ from src.skill_extraction.soft_skill_seed_extractor import (
     _map_to_dimension,
     extract_soft_skill_seeds,
 )
-from src.skill_extraction.soft_skill_dictionary_builder import (
+from src.skill_extraction.soft.dictionary_builder import (
     DIMENSION_DISPLAY_NAMES,
     _STATIC_ALIASES,
     _build_skill_entry,
@@ -249,7 +249,7 @@ class TestExtractSoftSkillSeeds:
     """extract_soft_skill_seeds 函数测试。"""
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_db_failure_uses_fallback(self, mock_fetch):
         """数据库查询失败时使用兜底种子词。"""
@@ -260,7 +260,7 @@ class TestExtractSoftSkillSeeds:
             assert len(words) > 0
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_db_failure_raises_when_fallback_disabled(self, mock_fetch):
         """禁用兜底时，数据库错误直接抛出。"""
@@ -269,7 +269,7 @@ class TestExtractSoftSkillSeeds:
             extract_soft_skill_seeds(fallback_on_db_error=False)
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_empty_db_result_uses_fallback(self, mock_fetch):
         """数据库返回空列表时使用兜底种子词。"""
@@ -279,7 +279,7 @@ class TestExtractSoftSkillSeeds:
             assert len(words) > 0
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_normal_extraction(self, mock_fetch):
         """正常提取流程：从数据库标注词中提取并分组。"""
@@ -302,7 +302,7 @@ class TestExtractSoftSkillSeeds:
             assert "Python" not in words
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_comma_separated_skills_parsed(self, mock_fetch):
         """逗号分隔的多值字段被正确拆分。"""
@@ -316,7 +316,7 @@ class TestExtractSoftSkillSeeds:
         assert "想象力" in result["openness"]
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_chinese_comma_separator(self, mock_fetch):
         """中文逗号分隔符也能正确处理。"""
@@ -330,7 +330,7 @@ class TestExtractSoftSkillSeeds:
         assert "想象力" in result["openness"]
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_custom_min_frequency(self, mock_fetch):
         """自定义最低频次阈值生效。"""
@@ -346,7 +346,7 @@ class TestExtractSoftSkillSeeds:
         assert "创新" not in result["openness"]
 
     @patch(
-        "src.skill_extraction.soft_skill_seed_extractor._fetch_soft_skills_from_db"
+        "src.skill_extraction.soft.seed_extractor._fetch_soft_skills_from_db"
     )
     def test_result_structure(self, mock_fetch):
         """返回结构为 dict[str, list[str]]。"""

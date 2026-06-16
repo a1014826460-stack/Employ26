@@ -87,7 +87,7 @@ job_title_parsing:
 skill_extraction:
   requirement_match_table: public.skill_extraction_requirement_matches
   occupation_detail_match_table: public.occupation_detail_matches
-  occupation_detail_model_path: output/penghui/rag_round2_training/bge-large-round2-finetuned
+  occupation_detail_model_path: output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned
   occupation_detail_top_k: 10
   llm_base_url: https://api.ofox.ai/v1
   llm_env_file: .env.local
@@ -117,3 +117,4 @@ model_paths:
     qwen3_6_27b_uncensored_balanced: D:/model/Qwen3.6-27B-Uncensored-Balanced
     qwen3_6_27b_uncensored_balanced_q4_k_p: D:/model/Qwen3.6-27B-Uncensored-Balanced-Q4_K_P
     qwen3_6_35b_a3b_fp8: D:/model/Qwen3.6-35B-A3B-FP8
+

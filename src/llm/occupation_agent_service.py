@@ -9,7 +9,6 @@ from typing import Any
 
 import pandas as pd
 
-from src.skill_extraction.bge_matcher import OccupationBGEMatcher
 from src.skill_extraction.config import SkillExtractionConfig, load_skill_extraction_config
 from src.utils.vllm_utils import (
     VLLMConfig,
@@ -22,7 +21,7 @@ from src.utils.vllm_utils import (
 
 
 DEFAULT_MODEL_RECIPE = "v1-bge-large"
-DEFAULT_MODEL_PATH = "output/penghui/rag_round2_training/bge-large-round2-finetuned"
+DEFAULT_MODEL_PATH = "output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned"
 
 
 @dataclass(frozen=True)
@@ -141,6 +140,18 @@ class OccupationAgentService:
             match_top_k=max(10, int(base_config.occupation_detail_top_k)),
         )
         self.vllm_config = vllm_config or load_vllm_config()
+        try:
+            from src.skill_extraction.bge_matcher import OccupationBGEMatcher
+        except ModuleNotFoundError as exc:
+            if exc.name == "sentence_transformers":
+                raise RuntimeError(
+                    "当前 Python 环境缺少 sentence_transformers，无法加载 BGE 检索模型。\n"
+                    "请优先使用项目内解释器启动：\n"
+                    "  .\\.conda\\python.exe -m src.llm.occupation_agent_api --host 127.0.0.1 --port 8120\n"
+                    "如果必须使用当前解释器，请先安装依赖：\n"
+                    "  python -m pip install sentence-transformers"
+                ) from exc
+            raise
         self.matcher = OccupationBGEMatcher(self.skill_config)
         self.matcher.build_index(force_rebuild=force_rebuild_index)
 
@@ -220,3 +231,4 @@ def dumps_response(payload: dict[str, Any]) -> str:
 def request_to_dict(request: OccupationAnalysisRequest) -> dict[str, Any]:
     """Expose dataclass conversion for tests and thin wrappers."""
     return asdict(request)
+

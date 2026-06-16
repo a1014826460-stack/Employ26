@@ -18,6 +18,7 @@ def test_skill_extraction_config_exposes_occupation_detail_match_defaults():
 
     assert config.occupation_detail_match_table == "public.occupation_detail_matches"
     assert str(config.occupation_detail_model_path).replace("\\", "/").endswith(
-        "output/penghui/rag_round2_training/bge-large-round2-finetuned"
+        "output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned"
     )
     assert config.occupation_detail_top_k == 10
+

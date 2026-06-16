@@ -33,7 +33,7 @@ _Avoid_: Vague data provenance, switching between tables/views/field semantics w
 _Avoid_: Multi-variable “challenge” runs, crediting a new base model for gains caused by recipe changes
 
 **Challenger Win Criteria**:
-底座模型挑战只有在统一评估中同时守住主检索指标并未明显牺牲层级准确率时，才可视为取代基线。对 Penghui 检索实验而言，第一轮主胜负指标是 `candidate_acc` 与 `mrr`，而 `subclass_acc` 与 `midclass_acc` 作为约束指标不应明显退步。
+底座模型挑战只有在统一评估中同时守住主检索指标并未明显牺牲层级准确率时，才可视为取代基线。对 occupation_retrieval 检索实验而言，第一轮主胜负指标是 `candidate_acc` 与 `mrr`，而 `subclass_acc` 与 `midclass_acc` 作为约束指标不应明显退步。
 _Avoid_: Declaring victory from a single flattering metric, trading away core retrieval quality for local gains
 
 **Parameterized Baseline Runner**:
@@ -479,3 +479,5 @@ _Avoid_: Silent remap, semantic overwrite
 **Historical Annotation Snapshot Row ID**:
 历史 `label_studio_tasks_v2.row_id` 在第二轮导出链路中表示 Label Studio 导出快照里的行号，而不是招聘源表主键。它只能用于回放历史任务对应的快照行，不能直接当作招聘记录身份。
 _Avoid_: public.jd_raw.row_id, canonical source primary key
+
+

@@ -28,8 +28,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.skill_extraction.soft_skill_matcher import SoftSkillMatcher
-from src.skill_extraction.soft_skill_llm_validator import (
+from src.skill_extraction.soft.matcher import SoftSkillMatcher
+from src.skill_extraction.soft.llm_validator import (
     _merge_validation_results,
     _parse_llm_response,
     validate_soft_skills,

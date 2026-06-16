@@ -1,4 +1,4 @@
-from src.skill_extraction.match_flat_skills_to_duckdb import should_trigger_strong_revalidation
+from src.skill_extraction.hard.pg_matcher import should_trigger_strong_revalidation
 
 
 def test_should_trigger_strong_revalidation_when_precision_too_high():
