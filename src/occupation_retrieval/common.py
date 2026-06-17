@@ -251,6 +251,50 @@ def get_training_output_dir() -> Path:
     return TRAINING_OUTPUT_DIR
 
 
+def resolve_output_file(name: str) -> Path:
+    """解析统一实验输出文件路径，并确保输出目录存在。
+
+    Args:
+        name: 输出文件名，不允许为空。
+
+    Returns:
+        Path: 位于 `output/occupation_retrieval` 下的文件路径。
+    """
+    normalized = str(name or "").strip()
+    if not normalized:
+        raise ValueError("输出文件名不能为空")
+    return get_occupation_retrieval_output_dir() / normalized
+
+
+def resolve_existing_model_path(path: str | Path, *, label: str) -> Path | str:
+    """解析并校验模型路径，缺失时给出清晰错误。
+
+    Args:
+        path: 模型目录或 HuggingFace 模型名。
+        label: 错误提示中的模型标签。
+
+    Returns:
+        Path | str: 本地模型路径，或保持原样的 HuggingFace 模型名。
+    """
+    raw = str(path or "").strip()
+    if not raw:
+        raise FileNotFoundError(f"{label} 模型路径为空")
+    target = Path(raw)
+    if target.exists():
+        return target
+    normalized = raw.replace("\\", "/")
+    if (
+        normalized.count("/") == 1
+        and not normalized.startswith((".", "/", "output/", "models/", "checkpoints/"))
+        and ":" not in normalized
+    ):
+        return raw
+    raise FileNotFoundError(
+        f"{label} 模型路径不存在: {target}. "
+        "请检查 config/database.yaml、EMPLOYDATA_BGE_MODEL_PATH 或命令行 --model 参数。"
+    )
+
+
 def resolve_model_dir(model_name: str) -> str:
     """解析模型目录，优先新目录，其次兼容历史输出目录。"""
     candidates = [

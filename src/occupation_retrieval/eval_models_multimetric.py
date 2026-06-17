@@ -21,14 +21,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 from collections import Counter
 from typing import Any
 
 import numpy as np
-import torch
-from sentence_transformers import SentenceTransformer
 
 from config.paths import get_project_paths
 from .common import (
@@ -39,7 +36,15 @@ from .common import (
     load_deepseek_records,
     load_occupation_dict_df,
     resolve_base_model_path,
+    resolve_existing_model_path,
     resolve_model_dir,
+)
+from .datasets import build_anchor, build_candidate_records, get_task_choices
+from .metrics import (
+    compute_candidate_accuracy,
+    reciprocal_rank,
+    same_hierarchy_level,
+    summarize_model_metrics,
 )
 
 _project = get_project_paths()
@@ -91,21 +96,6 @@ def build_model_paths(model_args: list[str]) -> dict[str, str]:
     return model_paths
 
 
-def parse_choice(annotation: dict[str, Any]) -> str | None:
-    """从单条标注记录中提取规范化后的候选选择。"""
-    for r in annotation.get("result", []):
-        if r["from_name"] == "best_candidate_choice":
-            choices = r["value"].get("choices", [])
-            if not choices:
-                return None
-            raw = choices[0]
-            if len(raw) >= 2 and raw[-1] in "ABCDE":
-                return raw[-1]
-            if "不" in raw:
-                return "NONE"
-    return None
-
-
 def load_dict() -> tuple[
     dict[str, str],
     dict[str, str],
@@ -146,6 +136,9 @@ def main() -> None:
     args = parse_args()
     model_paths = build_model_paths(args.model)
 
+    import torch
+    from sentence_transformers import SentenceTransformer
+
     print("Loading data...")
     raw_data = load_annotations_from_pg()
     ds_records = load_deepseek_records()
@@ -161,10 +154,10 @@ def main() -> None:
         jr = str(data.get("job_requirements_clean", "")).strip()
         if not jr:
             continue
-        anchor = f"{jt} {jr}"
+        anchor = build_anchor(jt, jr)
 
         anns = item["annotations"]
-        choices = [c for c in [parse_choice(a) for a in anns] if c and c != "NONE"]
+        choices = get_task_choices(item, include_none=False)
         if not choices:
             continue
         if len(anns) >= 2:
@@ -174,15 +167,15 @@ def main() -> None:
             hum_choice = choices[0]
 
         candidates: list[dict[str, str]] = []
-        for letter in "abcde":
-            title = str(data.get(f"candidate_{letter}_title", "")).strip()
-            code = str(data.get(f"candidate_{letter}_code", "")).strip()
-            source = str(data.get(f"candidate_{letter}_source", "")).strip()
+        for candidate in build_candidate_records(data):
+            title = candidate["title"]
+            code = candidate["code"]
+            source = candidate["source"]
             if not code:
                 continue
             text = c2text.get(code, title)
             candidates.append({
-                "letter": letter.upper(),
+                "letter": candidate["letter"],
                 "code": code,
                 "title": c2title.get(code, title),
                 "text": text,
@@ -218,7 +211,8 @@ def main() -> None:
         print(f"{'='*60}")
 
         device = get_runtime_device()
-        model = SentenceTransformer(model_path, device=device)
+        resolved_model_path = resolve_existing_model_path(model_path, label=model_name)
+        model = SentenceTransformer(str(resolved_model_path), device=device)
         model.max_seq_length = 256
 
         with torch.no_grad():
@@ -244,18 +238,21 @@ def main() -> None:
             "ds_total": 0,
         }
 
-        for sample in eval_samples:
+        candidate_anchor_texts = [sample["anchor"] for sample in eval_samples]
+        with torch.no_grad():
+            candidate_anchor_emb = model.encode(
+                candidate_anchor_texts,
+                batch_size=64,
+                normalize_embeddings=True,
+                show_progress_bar=True,
+                convert_to_tensor=True,
+            )
+
+        for sample_index, sample in enumerate(eval_samples):
             candidates = sample["candidates"]
             cand_texts = [c["text"] for c in candidates]
 
             with torch.no_grad():
-                anc_emb = model.encode(
-                    [sample["anchor"]],
-                    batch_size=1,
-                    normalize_embeddings=True,
-                    show_progress_bar=False,
-                    convert_to_tensor=True,
-                )
                 cand_emb = model.encode(
                     cand_texts,
                     batch_size=len(cand_texts),
@@ -263,14 +260,17 @@ def main() -> None:
                     show_progress_bar=False,
                     convert_to_tensor=True,
                 )
+                anc_emb = candidate_anchor_emb[sample_index].unsqueeze(0)
                 sims = torch.mm(anc_emb, cand_emb.T).squeeze(0)
                 sorted_idx = torch.argsort(sims, descending=True).cpu().tolist()
 
             model_pick = candidates[sorted_idx[0]]["letter"]
 
             results["candidate_total"] += 1
-            if model_pick == sample["human_choice"]:
-                results["candidate_hit"] += 1
+            results["candidate_hit"] += compute_candidate_accuracy(
+                model_pick,
+                sample["human_choice"],
+            )
 
             human_letter = sample["human_choice"]
             human_idx_in_cands = next(
@@ -334,27 +334,17 @@ def main() -> None:
                 rank = ranked.index(target_idx) + 1
             except ValueError:
                 rank = 51  # not in top 50
-            results["reciprocal_ranks"].append(1.0 / rank)
+            results["reciprocal_ranks"].append(reciprocal_rank(rank))
 
             pred_code = occ_codes[ranked[0]]
-            if c2subclass.get(code) == c2subclass.get(pred_code):
+            if same_hierarchy_level(code, pred_code, c2subclass):
                 results["subclass_hit"] += 1
-            if c2midclass.get(code) == c2midclass.get(pred_code):
+            if same_hierarchy_level(code, pred_code, c2midclass):
                 results["midclass_hit"] += 1
-            if c2major.get(code) == c2major.get(pred_code):
+            if same_hierarchy_level(code, pred_code, c2major):
                 results["major_hit"] += 1
 
-        results["candidate_acc"] = results["candidate_hit"] / results["candidate_total"] * 100
-        results["mean_human_rank"] = np.mean(results["human_rank_in_candidates"])
-        results["mrr"] = np.mean(results["reciprocal_ranks"])
-        results["subclass_acc"] = results["subclass_hit"] / results["full_total"] * 100
-        results["midclass_acc"] = results["midclass_hit"] / results["full_total"] * 100
-        results["major_acc"] = results["major_hit"] / results["full_total"] * 100
-        if results["ds_total"] > 0:
-            results["ds_side_human_pct"] = results["ds_side_human"] / results["ds_total"] * 100
-            results["ds_side_ds_pct"] = results["ds_side_ds"] / results["ds_total"] * 100
-        else:
-            results["ds_side_human_pct"] = results["ds_side_ds_pct"] = 0
+        results.update(summarize_model_metrics(results))
 
         all_results[model_name] = results
 

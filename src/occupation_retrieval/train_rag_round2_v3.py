@@ -42,6 +42,7 @@ from .common import (
     resolve_base_model_path,
     resolve_model_dir,
 )
+from .datasets import parse_choice as parse_human_choice
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
@@ -63,20 +64,6 @@ class Config:
     warmup_ratio: float = 0.1
     random_seed: int = 42
     test_ratio: float = 0.15  # Silver 中留出多少做测试
-
-
-def parse_human_choice(annotation: dict[str, Any]) -> str | None:
-    """从人工标注中提取规范化候选选择。"""
-    for r in annotation.get("result", []):
-        if r["from_name"] == "best_candidate_choice":
-            choices = r["value"].get("choices", [])
-            if choices:
-                raw = choices[0]
-                if len(raw) >= 2 and raw[-1] in "ABCDE":
-                    return raw[-1]
-                if "不" in raw:
-                    return "NONE"
-    return None
 
 
 def load_occupation_dict(dict_path: str) -> dict[str, str]:

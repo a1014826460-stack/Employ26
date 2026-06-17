@@ -43,6 +43,7 @@ from .common import (
     resolve_model_dir,
     safe_empty_cuda_cache,
 )
+from .datasets import parse_choice
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
@@ -64,21 +65,6 @@ class Config:
     # 负样本方案阈值
     pos_semantic_rank_max: int = 10   # DS一致+语义排名<=此值 → 正样本
     neg_semantic_rank_min: int = 30   # DS分歧+语义排名>=此值 → 负样本
-
-
-def parse_choice(annotation: dict[str, Any]) -> str | None:
-    """从单条标注中提取规范化后的候选选择。"""
-    for r in annotation.get("result", []):
-        if r["from_name"] == "best_candidate_choice":
-            choices = r["value"].get("choices", [])
-            if not choices:
-                return None
-            raw = choices[0]
-            if len(raw) >= 2 and raw[-1] in "ABCDE":
-                return raw[-1]
-            if "不" in raw:
-                return "NONE"
-    return None
 
 
 def load_dict() -> tuple[dict[str, str], dict[str, str]]:

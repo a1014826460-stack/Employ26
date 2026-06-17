@@ -624,63 +624,35 @@ $env:PYTHONIOENCODING='utf-8'
 - 第一轮挑战只替换底座模型，不同时修改样本构造、split、超参数和统一评估口径
 - 若 `bge-m3` 要取代当前基线，应至少在 `candidate_acc` 与 `mrr` 上同时不弱于当前 `v1`
 
-## 6. 当前共性问题
+## 6. 当前收敛状态
 
-这批脚本的共性问题比较明显，优先级大致如下：
+本目录已经完成一轮 P0/P1 级别的低风险工程收敛，目标是减少口径漂移和运行时隐性失败，同时不改变 frozen baseline 的训练配方、评估口径和默认模型路径。
 
-### P0：先修复，否则稳定性较差
+已完成：
 
-- 多个脚本把输入文件名写死为单个导出文件，不支持切换批次数据
-- `train_rag_weighted.py` 仍需检查并消除潜在 GPU 设备硬编码，避免无 GPU 环境不可运行
-- 不同脚本都各自实现了一遍标注解析、majority 计算、词典加载，容易出现口径漂移
+- `common.py` 统一负责 PostgreSQL 数据读取、DeepSeek 回填读取、职业词典读取、输出目录、训练输出目录、运行设备和 CUDA 清理。
+- `datasets.py` 统一负责 Label Studio 选择解析、任务选择列表、多数意见、候选 A-E 记录构造和 anchor 文本构造。
+- `metrics.py` 统一负责候选命中、倒数排名、层级命中和模型指标汇总。
+- `train_rag_round2.py`、`eval_models_multimetric.py`、`deep_analysis_round2.py` 已接入公共解析/指标工具。
+- `disagreement_deep_analysis.py`、`multidim_validation.py`、`train_rag_round2_v3.py`、`train_rag_round2_v4.py`、`train_rag_weighted.py` 已复用公共 `parse_choice()`，减少标注解析口径漂移。
+- `eval_models_multimetric.py` 已对候选排序阶段的 anchor 做批量编码，并在加载本地模型前提供更清晰的路径缺失错误。
+- 已补充最小单元测试，覆盖候选选择解析、多标注 majority、候选记录构造、anchor 构造和核心指标汇总。
 
-### P1：影响复现与维护
+仍保留为实验脚本的部分：
 
-- 大量阈值、关键词、采样规模、oversample 倍数直接写在脚本中
-- 模型路径、输出文件名、对比模型列表没有做统一配置
-- 训练集/测试集构造规则在不同版本间差异较大，但缺少统一说明
+- `v1 / v3 / v4 / weighted` 的训练样本构造和筛选规则仍分别保留在各自脚本中，以保证历史实验可复现。
+- tier 规则、大类关键词、oversample 倍数等实验规则仍在对应脚本中维护，暂不抽成统一配置。
+- 部分诊断脚本仍有逐条语义排名计算；后续只有在频繁重跑或运行时间成为瓶颈时再批量优化。
+- CLI 入口保持兼容，暂不增加新的数据源切换参数。
 
-### P2：影响性能与工程质量
+## 7. 后续改进建议
 
-- 多个脚本对每条任务逐条 `model.encode([anchor])`，运行效率偏低
-- 缺少基础测试，至少应覆盖标注解析、majority、tier 判定等核心逻辑
-- 报告写出方式不统一，有的只打印控制台，有的边跑边追加写文本
+若后续继续把本目录提升为长期维护模块，建议按下面顺序推进：
 
-## 7. 推荐修复顺序
-
-建议按下面顺序收敛：
-
-1. 抽公共模块  
-   新建如 `src/occupation_retrieval/common.py`，统一实现：
-   - 标注文件加载
-   - `parse_choice()`
-   - majority / pairwise agreement 统计
-   - 职业词典加载
-   - DeepSeek 结果加载
-
-2. 给脚本加 CLI 参数  
-   至少支持：
-   - `--annotation-file`
-   - `--deepseek-file`
-   - `--dict-file`
-   - `--output-dir` / `--output-file`
-   - `--device`
-
-3. 消除硬编码 GPU  
-   统一改成自动选择 `cuda` 或 `cpu`。
-
-4. 向量化语义排名计算  
-   预先批量编码 anchor，避免每条任务单独推理。
-
-5. 统一实验配置  
-   将 tier 规则、语义排名阈值、测试集抽样规模、oversample 系数抽成配置对象。
-
-6. 补最小测试  
-   至少覆盖：
-   - 候选选择解析
-   - 多标注 majority 判定
-   - tier 计算结果
-   - 数据切分基本约束
+1. 将 tier 规则、语义排名阈值、测试集抽样规模、oversample 系数抽成显式配置对象。
+2. 给分析脚本补充 `--output-file` 和 `--limit` 等轻量 CLI 参数，方便小样本复核。
+3. 将仍然频繁运行的逐条 `model.encode([anchor])` 改成批量编码。
+4. 只保留 1 个总览分析入口、1 个样本筛选入口、1 个基础训练入口和 1 个多模型评估入口；其他历史版本转入 `archive/` 或标注为 `experimental/`。
 
 ## 8. 建议的后续归档方式
 

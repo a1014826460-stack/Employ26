@@ -37,33 +37,12 @@ from .common import (
     load_occupation_dict_df,
     resolve_base_model_path,
 )
+from .datasets import parse_choice
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
 OUTPUT_FILE = os.path.join(get_occupation_retrieval_output_dir(), "disagreement_analysis.txt")
 MODEL_PATH = resolve_base_model_path()
-
-
-def parse_choice(annotation: dict[str, Any]) -> Optional[str]:
-    """从单条标注记录中提取标准化选择结果。
-
-    Args:
-        annotation: Label Studio 的单条 annotation 结构。
-
-    Returns:
-        规范化后的 `A-E` / `NONE`，若无有效选择则返回 `None`。
-    """
-    for r in annotation.get("result", []):
-        if r["from_name"] == "best_candidate_choice":
-            choices = r["value"].get("choices", [])
-            if not choices:
-                return None
-            raw = choices[0]
-            if len(raw) >= 2 and raw[-1] in "ABCDE":
-                return raw[-1]
-            if "不" in raw:
-                return "NONE"
-    return None
 
 
 def load_dict() -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:

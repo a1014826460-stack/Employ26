@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .common import get_occupation_retrieval_output_dir, load_annotations_from_pg
+from .datasets import get_majority_choice, parse_choice
 
 TaskPayload = dict[str, Any]
 TaskMap = dict[int, TaskPayload]
@@ -31,19 +32,7 @@ def load_task_annotations(raw_data: list[dict[str, Any]]) -> TaskMap:
         task_id = item["task_id"]
         ann_list: list[Optional[str]] = []
         for ann in item["annotations"]:
-            choice: Optional[str] = None
-            for result in ann["result"]:
-                if result["from_name"] != "best_candidate_choice":
-                    continue
-                choices = result["value"].get("choices", [])
-                if not choices:
-                    continue
-                raw_choice = choices[0]
-                if len(raw_choice) >= 2 and raw_choice[-1] in "ABCDE":
-                    choice = raw_choice[-1]
-                elif "不" in raw_choice:
-                    choice = "NONE"
-            ann_list.append(choice)
+            ann_list.append(parse_choice(ann))
 
         task_annotations[task_id] = {
             "annotations": ann_list,
@@ -66,9 +55,8 @@ def get_majority(task: TaskPayload) -> Optional[str]:
     if not choices:
         return None
 
-    counter = Counter(choices)
-    top_choice, _ = counter.most_common(1)[0]
-    return top_choice
+    majority, _ = get_majority_choice(choices, require_strict=False)
+    return majority
 
 
 def find_choice_topk(data: dict[str, Any], choice: str) -> Optional[int]:

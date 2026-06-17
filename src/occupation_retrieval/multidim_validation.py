@@ -44,6 +44,7 @@ from .common import (
     load_occupation_dict_df,
     resolve_base_model_path,
 )
+from .datasets import parse_choice
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
@@ -84,21 +85,6 @@ MAJOR_CLASS_KEYWORDS = {
         "label": "管理人员"
     },
 }
-
-
-def parse_choice(annotation: dict[str, Any]) -> str | None:
-    """从单条标注记录中提取标准化后的候选选择。"""
-    for r in annotation.get("result", []):
-        if r["from_name"] == "best_candidate_choice":
-            choices = r["value"].get("choices", [])
-            if not choices:
-                return None
-            raw = choices[0]
-            if len(raw) >= 2 and raw[-1] in "ABCDE":
-                return raw[-1]
-            if "不" in raw:
-                return "NONE"
-    return None
 
 
 def load_occupation_dict(

@@ -34,9 +34,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import torch
-from sentence_transformers import SentenceTransformer, InputExample, losses
-from torch.utils.data import DataLoader
 
 from config.paths import get_project_paths
 from .common import (
@@ -45,7 +42,9 @@ from .common import (
     load_annotations_from_pg,
     load_occupation_dict_df,
     resolve_base_model_path,
+    resolve_existing_model_path,
 )
+from .datasets import build_anchor, get_majority_choice, get_task_choices, parse_choice
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
@@ -159,21 +158,6 @@ def build_run_settings(args: argparse.Namespace) -> RunSettings:
     )
 
 
-# ── 辅助函数 ────────────────────────────────────────
-def parse_choice(annotation: dict[str, Any]) -> str | None:
-    """从标注记录中提取最佳候选选择。"""
-    for r in annotation.get("result", []):
-        if r["from_name"] == "best_candidate_choice":
-            choices = r["value"].get("choices", [])
-            if choices:
-                raw = choices[0]
-                if len(raw) >= 2 and raw[-1] in "ABCDE":
-                    return raw[-1]
-                if "不" in raw:  # 以上选项都不属于
-                    return "NONE"
-    return None
-
-
 def load_occupation_dict(dict_path: str) -> dict[str, str]:
     """加载《中国职业大典》，返回 {code: full_text} 映射。"""
     df = load_occupation_dict_df()
@@ -252,14 +236,10 @@ def extract_training_pairs(
             continue
 
         # 构建 anchor 文本
-        anchor = f"{job_title} {job_reqs}" if job_title else job_reqs
+        anchor = build_anchor(job_title, job_reqs)
 
         # 获取所有标注的选择
-        choices = []
-        for ann in item["annotations"]:
-            choice = parse_choice(ann)
-            if choice and choice != "NONE":
-                choices.append(choice)
+        choices = get_task_choices(item, include_none=False)
 
         if not choices:
             skipped_none += 1
@@ -267,9 +247,8 @@ def extract_training_pairs(
 
         # 确定参考答案（多数意见或单标注）
         if len(item["annotations"]) >= 2:
-            counter = Counter(choices)
-            ref_choice, count = counter.most_common(1)[0]
-            if count <= len(item["annotations"]) / 2:
+            ref_choice, count = get_majority_choice(choices, require_strict=False)
+            if not ref_choice or count <= len(item["annotations"]) / 2:
                 # 无明显多数，跳过
                 continue
             # 多标注任务
@@ -333,9 +312,9 @@ def split_train_test(
     multi_pairs: list[dict[str, Any]],
     config: TrainConfig,
 ) -> tuple[
-    list[InputExample],
+    list[Any],
     list[dict[str, Any]],
-    list[InputExample],
+    list[Any],
     list[dict[str, Any]],
 ]:
     """
@@ -350,6 +329,8 @@ def split_train_test(
     print("\n" + "=" * 70)
     print("[Step 2] 划分训练/测试集")
     print("=" * 70)
+
+    from sentence_transformers import InputExample
 
     random.seed(config.random_seed)
 
@@ -392,21 +373,28 @@ def split_train_test(
 
 # ── 3. 微调模型 ─────────────────────────────────────
 def train_model(
-    train_examples: list[InputExample],
+    train_examples: list[Any],
     config: TrainConfig,
     run_settings: RunSettings,
-) -> SentenceTransformer:
+) -> Any:
     """使用 MultipleNegativesRankingLoss 微调当前基础模型。"""
     print("\n" + "=" * 70)
     print("[Step 3] 微调检索模型")
     print("=" * 70)
+
+    from sentence_transformers import SentenceTransformer, losses
+    from torch.utils.data import DataLoader
 
     device = get_runtime_device()
     print(f"  设备: {device}")
     print(f"  基础模型: {run_settings.base_model_path}")
 
     # 加载模型
-    model = SentenceTransformer(run_settings.base_model_path, device=device)
+    base_model_path = resolve_existing_model_path(
+        run_settings.base_model_path,
+        label="基础 embedding",
+    )
+    model = SentenceTransformer(str(base_model_path), device=device)
     model.max_seq_length = config.max_seq_length
     print(f"  最大序列长度: {config.max_seq_length}")
     print(f"  嵌入维度: {model.get_sentence_embedding_dimension()}")
@@ -456,7 +444,7 @@ def train_model(
 
 # ── 4. 评估 ─────────────────────────────────────────
 def evaluate_model(
-    model: SentenceTransformer,
+    model: Any,
     test_pairs: list[dict[str, Any]],
     code_to_text: dict[str, str],
     config: TrainConfig,
@@ -466,6 +454,9 @@ def evaluate_model(
     print("\n" + "=" * 70)
     print("[Step 4] 评估检索准确率")
     print("=" * 70)
+
+    import torch
+    from sentence_transformers import SentenceTransformer
 
     device = get_runtime_device()
 
@@ -569,7 +560,11 @@ def evaluate_model(
 
     # 对比基准模型（未微调）
     print(f"\n  [对比基准] 未微调基础模型的准确率...")
-    base_model = SentenceTransformer(run_settings.base_model_path, device=device)
+    base_model_path = resolve_existing_model_path(
+        run_settings.base_model_path,
+        label="基础 embedding",
+    )
+    base_model = SentenceTransformer(str(base_model_path), device=device)
     base_model.max_seq_length = config.max_seq_length
 
     with torch.no_grad():

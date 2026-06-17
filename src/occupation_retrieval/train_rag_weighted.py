@@ -47,6 +47,7 @@ from .common import (
     resolve_model_dir,
     safe_empty_cuda_cache,
 )
+from .datasets import parse_choice
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
@@ -87,21 +88,6 @@ class Config:
     def __post_init__(self) -> None:
         """初始化每个质量层级对应的过采样倍数。"""
         self.oversample = {"S": 10, "A": 7, "B": 3, "C": 1, "D": 0}
-
-
-def parse_choice(ann: dict[str, Any]) -> str | None:
-    """从单条人工标注中提取规范化选择。"""
-    for r in ann.get("result", []):
-        if r["from_name"] == "best_candidate_choice":
-            choices = r["value"].get("choices", [])
-            if not choices:
-                return None
-            raw = choices[0]
-            if len(raw) >= 2 and raw[-1] in "ABCDE":
-                return raw[-1]
-            if "不" in raw:
-                return "NONE"
-    return None
 
 
 def load_dict() -> tuple[dict[str, str], dict[str, str]]:
