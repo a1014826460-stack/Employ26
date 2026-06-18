@@ -41,7 +41,7 @@ from .datasets import parse_choice
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
-OUTPUT_FILE = os.path.join(get_occupation_retrieval_output_dir(), "disagreement_analysis.txt")
+OUTPUT_FILE = os.path.join(get_occupation_retrieval_output_dir(), "disagreement_analysis.md")
 MODEL_PATH = resolve_base_model_path()
 
 

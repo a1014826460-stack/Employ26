@@ -26,7 +26,7 @@ from .common import get_occupation_retrieval_output_dir, load_annotations_from_p
 
 _project = get_project_paths()
 BASE = str(_project.project_root)
-OUTPUT_FILE = os.path.join(get_occupation_retrieval_output_dir(), "round2_validity_report.txt")
+OUTPUT_FILE = os.path.join(get_occupation_retrieval_output_dir(), "round2_validity_report.md")
 
 
 def extract_choice(annotation: dict[str, Any]) -> str | None:

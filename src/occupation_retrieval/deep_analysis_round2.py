@@ -22,7 +22,7 @@ from .datasets import get_majority_choice, parse_choice
 
 TaskPayload = dict[str, Any]
 TaskMap = dict[int, TaskPayload]
-OUTPUT_FILE = Path(get_occupation_retrieval_output_dir()) / "deep_analysis_round2.txt"
+OUTPUT_FILE = Path(get_occupation_retrieval_output_dir()) / "deep_analysis_round2.md"
 
 
 def load_task_annotations(raw_data: list[dict[str, Any]]) -> TaskMap:

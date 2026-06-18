@@ -18,29 +18,31 @@
 - 标注数据：PostgreSQL `annotations.label_studio_tasks_v2`
 - 其中历史任务的正式招聘身份应优先读取 `recruitment_record_id`；旧 `row_id` 只表示导出快照行号，不再代表招聘源主键
 - 在 `src/occupation_retrieval/common.py` 的公共加载口径里，`task_id` 只表示标注任务身份，不能替代 `recruitment_record_id`
-- DeepSeek 重标结果：优先 PostgreSQL `annotations.deepseek_relabel_raw`，首次缺表或空表时会从 `output/deepseek_relabel/deepseek_relabel_raw.jsonl` 回填
+- DeepSeek 重标结果：优先 PostgreSQL `annotations.deepseek_relabel_raw`，首次缺表或空表时会优先从 `output/deepseek_relabel/round2/round2_deepseek_relabel_raw.jsonl` 回填；旧路径 `output/deepseek_relabel/deepseek_relabel_raw.jsonl` 仅作兼容兜底
 - 职业词典：PostgreSQL `public.occ_dict_unified`
 - 基础向量模型：`config.paths.get_project_paths().bge_model_path` 或环境变量 `EMPLOYDATA_BGE_MODEL_PATH`
 
 常见输出位置：
 
-- 文本报告：`output/occupation_retrieval/*.txt`
+- Markdown 报告：`output/occupation_retrieval/*.md`
 - JSON 结果：`output/occupation_retrieval/*.json`
 - 微调模型与评估文件：`output/occupation_retrieval/rag_round2_training/`
+- 离线 Top10 质检报告：`output/occupation_retrieval/offline_top10_qc_report.md`
 
 ## 3. 脚本总览
 
 | 脚本 | 主要作用 | 典型输出 | 当前定位 |
 | --- | --- | --- | --- |
-| `reproduce_round2_validity.py` | 复现第二轮数据有效性分析 | `output/occupation_retrieval/round2_validity_report.txt` | 数据集整体体检 |
-| `deep_analysis_round2.py` | 统计任务级/标注级 TopK 命中与多数意见情况 | `output/occupation_retrieval/deep_analysis_round2.txt` | 轻量分析脚本 |
-| `disagreement_deep_analysis.py` | 深挖人类与 DeepSeek 分歧模式 | `output/occupation_retrieval/disagreement_analysis.txt` | 分歧诊断 |
-| `multidim_validation.py` | 用多信号给样本打质量分层 | `output/occupation_retrieval/multidim_validation_report.txt`、`output/occupation_retrieval/multidim_validation_results.json` | 标注质检 |
+| `reproduce_round2_validity.py` | 复现第二轮数据有效性分析 | `output/occupation_retrieval/round2_validity_report.md` | 数据集整体体检 |
+| `deep_analysis_round2.py` | 统计任务级/标注级 TopK 命中与多数意见情况 | `output/occupation_retrieval/deep_analysis_round2.md` | 轻量分析脚本 |
+| `disagreement_deep_analysis.py` | 深挖人类与 DeepSeek 分歧模式 | `output/occupation_retrieval/disagreement_analysis.md` | 分歧诊断 |
+| `multidim_validation.py` | 用多信号给样本打质量分层 | `output/occupation_retrieval/multidim_validation_report.md`、`output/occupation_retrieval/multidim_validation_results.json` | 标注质检 |
+| `offline_top10_qc.py` | 离线检查 Top10 候选是否命中 gold，并统计职业细类分布 | `output/occupation_retrieval/offline_top10_qc_report.md` | Top10 离线质检 |
 | `train_rag_round2.py` | v1：直接用第二轮标注训练基础检索模型 | 模型目录、`output/occupation_retrieval/rag_round2_training/evaluation_results.json` | 基线微调方案 |
 | `train_rag_round2_v3.py` | v3：用 Gold/Silver 样本训练 | 模型目录、`output/occupation_retrieval/rag_round2_training/evaluation_v3.json` | 噪声过滤方案 |
 | `train_rag_round2_v4.py` | v4：按分歧与语义排名筛正负样本 | 模型目录、`output/occupation_retrieval/rag_round2_training/evaluation_v4.json` | 中等强度过滤方案 |
 | `train_rag_weighted.py` | 置信分层加权训练 | 模型目录、`output/occupation_retrieval/rag_round2_training/evaluation_weighted.json` | 质量加权方案 |
-| `eval_models_multimetric.py` | 比较 baseline、v1、v3、v4 多项指标 | `output/occupation_retrieval/model_comparison.txt` | 模型横向评估 |
+| `eval_models_multimetric.py` | 比较 baseline、v1、v3、v4 多项指标 | `output/occupation_retrieval/model_comparison.md` | 模型横向评估 |
 
 ## 3.1 当前冻结基线
 
@@ -56,7 +58,7 @@
 - 当前输入字段口径仍是 `annotations_completed` + `data_raw` 的任务主表解析结果
 - 职业词典冻结为 `public.occ_dict_unified`，字段以 `code`、`title`、`desc`、`tasks` 为训练和评估文本来源
 - `annotations_completed_jsonb`、`data_raw_jsonb` 与 `annotations.v_label_studio_task_annotations_v2` 属于后续可挑战的“数据契约升级方案”，不与基线冻结动作同时进行
-- 正式定胜负以 `eval_models_multimetric.py` 及 `output/occupation_retrieval/model_comparison.txt` 为准
+- 正式定胜负以 `eval_models_multimetric.py` 及 `output/occupation_retrieval/model_comparison.md` 为准
 - 当前综合最强模型是 `output/occupation_retrieval/rag_round2_training/bge-large-round2-finetuned`
 
 当前最小 CLI 契约：
@@ -317,7 +319,7 @@
    `reproduce_round2_validity.py`、`deep_analysis_round2.py`
 
 2. 分歧与样本筛选层  
-   `disagreement_deep_analysis.py`、`multidim_validation.py`
+   `disagreement_deep_analysis.py`、`multidim_validation.py`、`offline_top10_qc.py`
 
 3. 训练与评估层  
    `train_rag_round2.py`、`train_rag_round2_v3.py`、`train_rag_round2_v4.py`、`train_rag_weighted.py`、`eval_models_multimetric.py`
@@ -334,6 +336,7 @@
 - 各训练脚本输出的 `evaluation_*.json` 主要用于各自实验内部诊断
 - 这些文件的测试集口径不同，不适合作为 `v1 / v3 / v4 / weighted / bge-m3` 的正式横向比较依据
 - 若要比较不同底座或不同训练方案，应统一回到 `eval_models_multimetric.py`
+- `offline_top10_qc.py` 只做离线分析和质检：先用确定性规则判断 Top10 是否命中 gold，再对 miss 样本做可选 LLM 复核，不会修改主指标口径。
 
 ## 5.2 V1 到 V4 的原理、技术栈与实验含义
 
@@ -466,7 +469,7 @@ Weighted 的意义是保留更多样本，同时强调高可信样本。但当�
 第二类是统一横评：
 
 - 入口：`python -m src.occupation_retrieval.eval_models_multimetric`
-- 报告：`output/occupation_retrieval/model_comparison.txt`
+- 报告：`output/occupation_retrieval/model_comparison.md`
 
 统一横评会把多个模型放到同一批评估样本和同一套指标下比较，因此更适合作为最终选择依据。
 
@@ -497,7 +500,7 @@ Weighted 的意义是保留更多样本，同时强调高可信样本。但当�
 
 最终选择 V1，不是因为 V1 理论上最复杂，而是因为它在统一横评里赢了最关键的业务指标。
 
-当前 `output/occupation_retrieval/model_comparison.txt` 显示：
+当前 `output/occupation_retrieval/model_comparison.md` 显示：
 
 - V1 候选选择准确率 57.4%，V4 为 52.8%。
 - V1 MRR 为 0.677，V4 为 0.606。
@@ -623,6 +626,29 @@ $env:PYTHONIOENCODING='utf-8'
 
 - 第一轮挑战只替换底座模型，不同时修改样本构造、split、超参数和统一评估口径
 - 若 `bge-m3` 要取代当前基线，应至少在 `candidate_acc` 与 `mrr` 上同时不弱于当前 `v1`
+
+## 5.8 离线 Top10 QC 报告
+
+如果只想做离线分析和质检，不改训练和评估口径，建议直接跑：
+
+```powershell
+python -m src.occupation_retrieval.offline_top10_qc
+```
+
+默认会输出：
+
+- `Hit@1 / Hit@3 / Hit@5 / Hit@10`
+- `HIT@10 / MISS@10 / GOLD_NONE / MISSING_GOLD / MISSING_MATCH`
+- gold 职业细类分布、占比、均匀性判断
+- Top10 miss 样本摘录
+
+如需加入本地 LLM 复核，只会复核 `MISS@10` 样本，不会改动主指标：
+
+```powershell
+python -m src.occupation_retrieval.offline_top10_qc --use-llm-review
+```
+
+当前 LLM 走项目统一入口 `src.model_platform.llm.create_llm_client()`，实际后端由 `config/model_runtime.yaml` 决定；默认是本地 `wsl_vllm`，有 fallback 才会尝试外部 API。
 
 ## 6. 当前收敛状态
 

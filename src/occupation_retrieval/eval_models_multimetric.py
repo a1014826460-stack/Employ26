@@ -50,7 +50,7 @@ from .metrics import (
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
 OUTPUT_DIR = str(get_training_output_dir())
-OUTPUT_FILE = os.path.join(get_occupation_retrieval_output_dir(), "model_comparison.txt")
+OUTPUT_FILE = os.path.join(get_occupation_retrieval_output_dir(), "model_comparison.md")
 
 DEFAULT_MODEL_PATHS = {
     "v1 (全量)":             resolve_model_dir("bge-large-round2-finetuned"),

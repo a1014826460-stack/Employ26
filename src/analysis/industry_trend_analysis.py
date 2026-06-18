@@ -134,13 +134,13 @@ class IndustryTrendAnalyzer:
         
         report_file = self.output_dir / '行业景气度分析报告.md'
         with open(report_file, 'w', encoding='utf-8') as f:
-            f.write("# 广东省招聘数据 - 行业景气度分析报告\n\n")
+            f.write("# Guangdong Recruitment Data - Industry Trend Analysis Report\n\n")
             
-            f.write("## 一、行业整体招聘量排行 (Top 30)\n\n")
+            f.write("## 1. Overall Industry Hiring Volume Ranking (Top 30)\n\n")
             for i, (industry, count) in enumerate(industry_total.head(30).items(), 1):
                 f.write(f"{i:3d}. {industry:40s}: {count:10,} 个岗位\n")
             
-            f.write("\n\n## 二、各城市主要行业分布\n\n")
+            f.write("\n\n## 2. Major Industry Distribution by City\n\n")
             for city in sorted(city_industry_total['city_clean'].unique()):
                 city_data = city_industry_total[city_industry_total['city_clean'] == city].head(10)
                 f.write(f"\n{city}:\n")
@@ -195,7 +195,7 @@ class IndustryTrendAnalyzer:
 <html>
 <head>
     <meta charset="utf-8">
-    <title>行业景气度分析</title>
+    <title>Industry Trend Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         body {{
@@ -222,15 +222,15 @@ class IndustryTrendAnalyzer:
     </style>
 </head>
 <body>
-    <h1>广东省招聘数据 - 行业景气度分析</h1>
+    <h1>Guangdong Recruitment Data - Industry Trend Analysis</h1>
     
     <div class="chart-container">
-        <h2>行业招聘量排行 (Top 20)</h2>
+        <h2>Industry Hiring Volume Ranking (Top 20)</h2>
         <div id="industry-bar" class="chart"></div>
     </div>
     
     <div class="chart-container">
-        <h2>主要行业月度招聘量趋势 (Top 15)</h2>
+        <h2>Main Industry Monthly Hiring Trend (Top 15)</h2>
         <div id="industry-trend" class="chart"></div>
     </div>
     

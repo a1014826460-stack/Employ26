@@ -289,20 +289,20 @@ class OccupationSalaryAnalyzer:
         
         report_file = self.output_dir / '职业类别薪资分析报告.md'
         with open(report_file, 'w', encoding='utf-8') as f:
-            f.write("# 广东省招聘数据 - 职业类别薪资分析报告\n\n")
+            f.write("# Guangdong Recruitment Data - Occupation Salary Analysis Report\n\n")
             
-            f.write("## 一、职业类别薪资统计\n\n")
+            f.write("## 1. Occupation Category Salary Statistics\n\n")
             for category, row in category_stats.iterrows():
                 f.write(f"{category:20s} - 平均: {row['平均薪资']:10,.0f}元 | "
                        f"中位数: {row['中位数薪资']:10,.0f}元 | 岗位数: {int(row['岗位数量']):8,}\n")
             
-            f.write("\n\n## 二、职业核心词薪资排行 (Top 50)\n\n")
+            f.write("\n\n## 2. Occupation Core Salary Ranking (Top 50)\n\n")
             for i, (core, row) in enumerate(core_stats.head(50).iterrows(), 1):
                 f.write(f"{i:3d}. {core:30s} - 平均: {row['平均薪资']:10,.0f}元 | "
                        f"中位数: {row['中位数薪资']:10,.0f}元 | 岗位数: {int(row['岗位数量']):8,}\n")
             
             if edu_category_stats is not None:
-                f.write("\n\n## 三、学历×职业类别薪资分析\n\n")
+                f.write("\n\n## 3. Education x Occupation Category Salary Analysis\n\n")
                 for edu in ['博士', '硕士', '本科', '大专']:
                     edu_data = edu_category_stats[edu_category_stats['学历'] == edu]
                     if len(edu_data) > 0:
@@ -313,7 +313,7 @@ class OccupationSalaryAnalyzer:
                                    f"岗位数: {int(row['岗位数量']):6,}\n")
             
             if edu_occupation_stats is not None:
-                f.write("\n\n## 四、学历×职业薪资分析（主口径）\n\n")
+                f.write("\n\n## 4. Education x Occupation Salary Analysis (Primary View)\n\n")
                 for edu in ['博士', '硕士', '本科', '大专']:
                     edu_data = edu_occupation_stats[edu_occupation_stats['学历'] == edu]
                     if len(edu_data) > 0:
@@ -397,7 +397,7 @@ class OccupationSalaryAnalyzer:
 <html>
 <head>
     <meta charset="utf-8">
-    <title>职业类别薪资分析</title>
+    <title>Occupation Salary Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         body {{
@@ -424,15 +424,15 @@ class OccupationSalaryAnalyzer:
     </style>
 </head>
 <body>
-    <h1>广东省招聘数据 - 职业类别薪资分析</h1>
+    <h1>Guangdong Recruitment Data - Occupation Salary Analysis</h1>
     
     <div class="chart-container">
-        <h2>职业类别平均薪资</h2>
+        <h2>Occupation Category Average Salary</h2>
         <div id="category-chart" class="chart"></div>
     </div>
     
     <div class="chart-container">
-        <h2>职业类别月度薪资趋势</h2>
+        <h2>Occupation Category Monthly Salary Trend</h2>
         <div id="trend-chart" class="chart"></div>
     </div>
     

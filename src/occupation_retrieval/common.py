@@ -18,7 +18,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from config.paths import get_project_paths
-from src.db.postgres import create_pg_engine, table_exists
+from src.db.postgres import create_pg_engine, get_table_columns, table_exists
 
 PROJECT_PATHS = get_project_paths()
 PROJECT_ROOT = PROJECT_PATHS.project_root
@@ -29,6 +29,16 @@ LEGACY_TRAINING_OUTPUT_DIR = PROJECT_ROOT / "output" / "rag_round2_training"
 DEFAULT_TASK_TABLE = "annotations.label_studio_tasks_v2"
 DEFAULT_DEEPSEEK_TABLE = "annotations.deepseek_relabel_raw"
 DEFAULT_OCC_TABLE = "public.occ_dict_unified"
+DEEPSEEK_REQUIRED_COLUMNS = {
+    "recruitment_record_id": "text",
+    "job_title": "text",
+    "deepseek_choice": "text",
+    "deepseek_confidence": "double precision",
+    "deepseek_reasoning": "text",
+    "deepseek_raw_response": "text",
+    "candidates": "jsonb",
+    "payload": "jsonb",
+}
 
 
 def ensure_deepseek_table(
@@ -38,7 +48,15 @@ def ensure_deepseek_table(
 ) -> str:
     """确保 DeepSeek 重标结果已同步到 PostgreSQL。"""
     if jsonl_path is None:
-        jsonl_path = PROJECT_ROOT / "output" / "deepseek_relabel" / "deepseek_relabel_raw.jsonl"
+        candidate_paths = [
+            PROJECT_ROOT
+            / "output"
+            / "deepseek_relabel"
+            / "round2"
+            / "round2_deepseek_relabel_raw.jsonl",
+            PROJECT_ROOT / "output" / "deepseek_relabel" / "deepseek_relabel_raw.jsonl",
+        ]
+        jsonl_path = next((path for path in candidate_paths if path.exists()), candidate_paths[0])
     schema, table = table_name.split(".", 1)
 
     engine = create_pg_engine()
@@ -50,6 +68,7 @@ def ensure_deepseek_table(
                     f"""
                     create table if not exists {table_name} (
                         task_id integer primary key,
+                        recruitment_record_id text,
                         job_title text,
                         deepseek_choice text,
                         deepseek_confidence double precision,
@@ -61,6 +80,15 @@ def ensure_deepseek_table(
                     """
                 )
             )
+        else:
+            existing_columns = set(get_table_columns(conn, schema, table))
+            for column_name, column_type in DEEPSEEK_REQUIRED_COLUMNS.items():
+                if column_name not in existing_columns:
+                    conn.execute(
+                        text(
+                            f'alter table {table_name} add column if not exists {column_name} {column_type}'
+                        )
+                    )
 
         row_count = conn.execute(text(f"select count(*) from {table_name}")).scalar_one()
         if row_count > 0:
@@ -79,6 +107,7 @@ def ensure_deepseek_table(
                 records.append(
                     {
                         "task_id": int(payload["task_id"]),
+                        "recruitment_record_id": str(payload.get("recruitment_record_id", "")),
                         "job_title": str(payload.get("job_title", "")),
                         "deepseek_choice": payload.get("deepseek_choice"),
                         "deepseek_confidence": payload.get("deepseek_confidence"),
@@ -93,6 +122,7 @@ def ensure_deepseek_table(
             f"""
             insert into {table_name} (
                 task_id,
+                recruitment_record_id,
                 job_title,
                 deepseek_choice,
                 deepseek_confidence,
@@ -102,6 +132,7 @@ def ensure_deepseek_table(
                 payload
             ) values (
                 :task_id,
+                :recruitment_record_id,
                 :job_title,
                 :deepseek_choice,
                 :deepseek_confidence,
@@ -111,6 +142,7 @@ def ensure_deepseek_table(
                 cast(:payload as jsonb)
             )
             on conflict (task_id) do update set
+                recruitment_record_id = excluded.recruitment_record_id,
                 job_title = excluded.job_title,
                 deepseek_choice = excluded.deepseek_choice,
                 deepseek_confidence = excluded.deepseek_confidence,

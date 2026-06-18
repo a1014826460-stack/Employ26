@@ -314,10 +314,10 @@ class ExcelReportGenerator:
         summaries = []
         
         report_files = [
-            ('职业类别薪资分析报告.md', '职业薪资分析'),
-            ('学历需求分布分析报告.md', '学历需求分布'),
-            ('行业景气度分析报告.md', '行业景气度'),
-            ('结构化维度补充分析报告.md', '结构化维度补充'),
+            ('职业类别薪资分析报告.md', 'Occupation Salary Analysis'),
+            ('学历需求分布分析报告.md', 'Education Requirement Distribution'),
+            ('行业景气度分析报告.md', 'Industry Trend Analysis'),
+            ('结构化维度补充分析报告.md', 'Structured Dimension Supplementary Analysis'),
         ]
         
         for filename, title in report_files:

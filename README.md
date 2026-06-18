@@ -1,6 +1,6 @@
 # 广东省招聘数据 NLP 分析项目
 
-> 最后更新: 2026-06-08
+> 最后更新: 2026-06-17
 
 基于广东省三大招聘网站 2022-2025 年招聘数据的 NLP 分析项目，聚焦岗位名称匹配、技能抽取、职业知识检索与相关分析流程。
 
@@ -97,6 +97,7 @@ Employ26/
 │   └── tests/                  # 测试
 ├── config/                     # 配置与路径管理
 ├── dicts/                      # 词典、黑名单、别名表
+├── logs/                       # 运行日志与排错日志
 ├── output/                     # 输出目录
 ├── archive/                    # 历史代码与实验归档
 ├── README.md
@@ -112,8 +113,11 @@ Employ26/
 - 标注数据位于 `annotations` schema，常用联查视图为 `annotations.v_label_studio_task_annotations_v2`
 - 职业词典、匹配结果、训练特征等公共处理表主要位于 `public`
 - 数据库结构、字段、索引与引用规范详见 `Employ26-database.md`
-- 报告类文本和图表输出到 `output/reports/`
+- 日志文件统一存放到 `logs/`
+- `output/` 统一存放中间结果、最终产物、报告、图表和归档副本
+- 报告类文本和图表默认输出到 `output/reports/`
 - 数据文件约 5GB，不提交到 git
+- 过期输出优先归档到 `output/archive/YYYY-MM/`，并在文件名中追加 `_archived`
 
 配置、模型路径和数据库连接参数统一通过 `config/paths.py` 管理，并支持 `EMPLOYDATA_*` 环境变量覆盖。
 
@@ -141,6 +145,15 @@ python -m src.rag.cli build
 python -m src.rag.cli query --title "Java开发工程师" --requirements "..."
 python -m src.rag.cli judge --title "..." --requirements "..." --candidates-json "[...]"
 ```
+
+### 第二轮 DeepSeek 检验性标注
+
+```bash
+python -m src.anno_analysis.deepseek_round2_relabel --dry-run
+python -m src.anno_analysis.deepseek_round2_relabel --workers 2
+```
+
+输出会进入 `output/deepseek_relabel/round2/`，运行日志写入 `logs/`。
 
 ### 历史完整流程
 

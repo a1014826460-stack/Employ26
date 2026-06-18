@@ -145,15 +145,15 @@ class StructuredDimensionAnalyzer:
         report_path.write_text(
             "\n".join(
                 [
-                    "# 结构化维度补充分析报告",
+                    "# Structured Dimension Supplementary Analysis Report",
                     "",
-                    "## 一、经验要求 × 职业",
+                    "## 1. Experience Requirements x Occupation",
                     experience_df.head(30).to_string(index=False) if not experience_df.empty else "无结果",
                     "",
-                    "## 二、公司规模 × 城市 × 行业",
+                    "## 2. Company Size x City x Industry",
                     company_size_df.head(30).to_string(index=False) if not company_size_df.empty else "无结果",
                     "",
-                    "## 三、城市 × 职业需求",
+                    "## 3. City x Occupation Demand",
                     city_occupation_df.head(30).to_string(index=False) if not city_occupation_df.empty else "无结果",
                 ]
             ),

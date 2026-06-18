@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> 最后更新: 2026-06-13
+> 最后更新: 2026-06-17
 > 适用对象: Codex、Claude Code、Cursor Agent 等代码代理
 
 本文件是本仓库的代理协作规范。它不负责介绍项目背景，也不承担新成员 onboarding；这些内容放在 `README.md`。  
@@ -103,8 +103,12 @@ tasks_table = paths.get_table_name("annotations", "tasks_v2")
 - benchmark、压测、临时验证或其他测试数据需要写入 PostgreSQL 时，必须使用 `test` schema，禁止写入 `public` schema
 - 根目录 `Employ26-database.md` 是数据库结构、字段、索引和引用规范的权威文档；改数据库或写 SQL 前必须先查它
 - `config/database.yaml` 只允许写真实存在的 PostgreSQL 表；如果 PG 没有对应表，宁可不配置，也不要写封存 DuckDB 表名
-- 报告类文本输出到 `output/reports/`
+- 日志文件统一写入根目录 `logs/`，不要把 `.log`、`.err`、`.stdout`、`.stderr` 这类运行日志继续散落到 `output/`
+- `output/` 只承载中间结果、最终结构化产物、报告、图表和归档副本
+- 报告类文本和图表默认输出到 `output/reports/`
+- 过期输出归档到 `output/archive/YYYY-MM/`，文件名追加 `_archived`
 - 词典、黑名单、别名表等词汇资源放在 `dicts/`，不要硬编码进 Python
+- 第二轮 DeepSeek 检验性标注的正式入口是 `python -m src.anno_analysis.deepseek_round2_relabel`，过程文件统一写入 `output/deepseek_relabel/round2/`，运行日志统一写入 `logs/`
 
 ### 导入与运行方式
 
