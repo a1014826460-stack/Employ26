@@ -6,7 +6,7 @@
 llm:
   default_backend: wsl_vllm
   fallback_backend: external_api
-  vllm_config: config/vllm.toml
+  vllm_config: config/vllm_qwen3_8b.toml
   env_file: .env.local
   request_timeout: 600
   retry: 2

@@ -18,6 +18,10 @@ import pandas as pd
 from sqlalchemy import text
 
 from config.paths import get_project_paths
+from src.db.label_studio_task_source_identity import (
+    DEFAULT_IDENTITY_TABLE,
+    load_all_task_identity_map,
+)
 from src.db.postgres import create_pg_engine, get_table_columns, table_exists
 
 PROJECT_PATHS = get_project_paths()
@@ -160,6 +164,8 @@ def load_annotations_from_pg(
     *,
     table_name: str = DEFAULT_TASK_TABLE,
     require_recruitment_record_id: bool = True,
+    use_task_source_identity: bool = False,
+    identity_table: str = DEFAULT_IDENTITY_TABLE,
 ) -> list[dict[str, Any]]:
     """从 PostgreSQL 读取任务表，并重建为实验脚本使用的结构。
 
@@ -170,6 +176,9 @@ def load_annotations_from_pg(
     """
     engine = create_pg_engine()
     with engine.connect() as conn:
+        identity_map: dict[int, dict[str, Any]] = {}
+        if use_task_source_identity:
+            identity_map = load_all_task_identity_map(conn, identity_table=identity_table)
         available_columns = {
             str(row[0])
             for row in conn.execute(
@@ -206,6 +215,12 @@ def load_annotations_from_pg(
             annotations_raw = row["annotations_completed"] or "[]"
             data_raw = row["data_raw"] or "{}"
             recruitment_record_id = str(row["recruitment_record_id"] or "")
+            identity_row = identity_map.get(int(row["task_id"]))
+            identity_status = ""
+            if identity_row:
+                identity_status = str(identity_row.get("identity_status") or "")
+                if identity_status in {"AUTO_CONFIRMED", "MANUAL_CONFIRMED"}:
+                    recruitment_record_id = str(identity_row.get("selected_recruitment_record_id") or "")
             if require_recruitment_record_id and not recruitment_record_id:
                 raise ValueError(
                     "检测到缺失 recruitment_record_id 的标注任务，"
@@ -215,6 +230,8 @@ def load_annotations_from_pg(
                 {
                     "task_id": int(row["task_id"]),
                     "recruitment_record_id": recruitment_record_id,
+                    "task_source_identity_status": identity_status,
+                    "task_source_identity": identity_row or {},
                     "annotations": json.loads(annotations_raw),
                     "data": json.loads(data_raw),
                 }

@@ -1,6 +1,6 @@
 [server]
-host = "127.0.0.1"
-port = 8100
+host = "172.27.202.75"
+port = 8112
 startup_timeout_seconds = 1800
 request_timeout_seconds = 600
 
@@ -10,18 +10,12 @@ vllm_env = "/home/lin/llm-env"
 vllm_bin = "/home/lin/llm-env/bin/vllm"
 
 [model]
-# name = "Qwen3.6-27B-int4-AutoRound"
-name = "Qwen3.6-27B-Uncensored-Balanced"
+name = "/home/lin/models/Qwen3.6-27B-Uncensored-Balanced/Qwen3.6-27B-Uncensored-HauhauCS-Balanced-Q4_K_P.gguf"
 windows_dir = ""
-# wsl_dir = "/home/lin/models/Qwen3.6-27B-int4-AutoRound"
 wsl_dir = "/home/lin/models/Qwen3.6-27B-Uncensored-Balanced/Qwen3.6-27B-Uncensored-HauhauCS-Balanced-Q4_K_P.gguf"
 
 [vllm]
-# ---- 思维链/推理开关 ----
-# false = 模型直接输出答案，安静模式
-# true  = 启用 reasoning-parser + tool-call-parser（需要模型支持）
 enable_reasoning = false
-
 dtype = "half"
 max_model_len = 4096
 gpu_memory_utilization = 0.90
@@ -35,7 +29,10 @@ tool_call_parser = "qwen3_xml"
 extra_args = []
 
 [chat]
-temperature = 0.2
-max_tokens = 1024
+temperature = 0.0
+max_tokens = 256
 enable_thinking = false
-system_prompt = "你是一个傲娇女仆。喜欢用脏话掩盖自己的真实感受，所以你习惯说什么都附带脏话，并且有很强的言语攻击性。但是每句话结尾还是会傲娇的附带一声‘喵’"
+system_prompt = "你是职业细类选择器。你只能从给定候选中选一个最合适的职业细类，并且必须输出 JSON。"
+
+
+

@@ -263,18 +263,18 @@ def create_v3_pipeline(
     返回:
         V3Pipeline: 初始化好的管线实例。
     """
-    from config.paths import get_project_paths
-
-    paths = get_project_paths()
-    project_root = paths.project_root
-
-    # 硬技能匹配器
-    from ..hard.matcher import FlatHardSkillMatcher, load_flat_dictionary
-
-    hard_dict_path = dict_path or (
-        project_root / "dicts" / "flat_skill_dictionary.json"
+    # 硬技能匹配器：默认从 PostgreSQL dict.hard_skills 加载；显式传入
+    # --dict-path 时保留 JSON 文件兼容。
+    from ..hard.matcher import (
+        FlatHardSkillMatcher,
+        load_flat_dictionary,
+        load_flat_dictionary_from_pg,
     )
-    hard_dict = load_flat_dictionary(str(hard_dict_path))
+
+    if dict_path is None:
+        hard_dict = load_flat_dictionary_from_pg()
+    else:
+        hard_dict = load_flat_dictionary(str(dict_path))
     hard_matcher = FlatHardSkillMatcher(hard_dict)
 
     # 软技能匹配器

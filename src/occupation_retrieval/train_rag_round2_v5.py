@@ -31,11 +31,9 @@ import random
 import re
 import time
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
 import torch
 from sentence_transformers import InputExample, SentenceTransformer
 from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
@@ -50,9 +48,8 @@ from .common import (
     load_occupation_dict_df,
     resolve_base_model_path,
     resolve_existing_model_path,
-    safe_empty_cuda_cache,
 )
-from .datasets import build_anchor, get_majority_choice, get_task_choices, parse_choice
+from .datasets import build_anchor, get_majority_choice, get_task_choices
 
 _project = get_project_paths()
 BASE_DIR = str(_project.project_root)
@@ -126,6 +123,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         help="DS 不一致但极高置信时的过采样倍数（默认: 0，不加入）。",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+        help="批次大小（默认: 32）。",
     )
     parser.add_argument(
         "--epochs",
@@ -310,7 +313,11 @@ def extract_training_pairs(
                     single_pairs.append(extra_pair)
             ds_agree_count += 1
 
-        elif ds_choice != ref_choice and ds_conf >= config.ds_disagree_conf_threshold and config.ds_disagree_oversample > 0:
+        elif (
+            ds_choice != ref_choice
+            and ds_conf >= config.ds_disagree_conf_threshold
+            and config.ds_disagree_oversample > 0
+        ):
             # DS 与人类不一致但极高置信 → 也加入（低权重）
             ds_code_key = f"candidate_{ds_choice.lower()}_code"
             ds_code = str(data.get(ds_code_key, "")).strip()
@@ -339,12 +346,12 @@ def extract_training_pairs(
     print(f"\n  单标注正样本: {len(single_pairs)} 对")
     print(f"  多标注正样本: {len(multi_pairs)} 对")
     print(f"  合计: {len(single_pairs) + len(multi_pairs)} 对")
-    print(f"\n  来源分布:")
+    print("\n  来源分布:")
     print(f"    人类标注: {n_human_pairs}")
     print(f"    DS一致过采样: {n_ds_agree_pairs} (来自 {ds_agree_count} 个任务)")
     print(f"    DS不一致但加入: {ds_disagree_added}")
     print(f"    仅DS标注: {ds_only_added}")
-    print(f"\n  跳过原因:")
+    print("\n  跳过原因:")
     print(f"    选了 NONE: {skipped_none}")
     print(f"    查不到代码: {skipped_no_code}")
     print(f"    代码不在大典中: {skipped_no_text}")
@@ -353,14 +360,14 @@ def extract_training_pairs(
     all_codes = [p["code"] for p in single_pairs] + [p["code"] for p in multi_pairs]
     code_counts = Counter(all_codes)
     print(f"\n  覆盖职业细类数: {len(code_counts)}")
-    print(f"  最频繁职业 Top5:")
+    print("  最频繁职业 Top5:")
     for ccode, cnt in code_counts.most_common(5):
         print(f"    {ccode}: {cnt} 条")
 
     return single_pairs, multi_pairs
 
 
-# ── 2. 划分训练/测试集 ──────────────────────────────
+# ── 2. 划分训练/测试集（按 task_id 分组，杜绝泄露）──
 def split_train_test(
     single_pairs: list[dict[str, Any]],
     multi_pairs: list[dict[str, Any]],
@@ -374,7 +381,8 @@ def split_train_test(
     """划分训练集和测试集。
 
     策略: 多标注任务全部作为测试集（高质量评估基准），
-          单标注任务按比例划分。
+          单标注任务按 task_id 分组后按比例划分，
+          保证同一 task 的所有副本（人标+DS过采样）不会同时出现在 train 和 test。
     """
     print("\n" + "=" * 70)
     print("[Step 2] 划分训练/测试集")
@@ -383,18 +391,49 @@ def split_train_test(
     random.seed(config.random_seed)
 
     if config.use_multi_ann_as_test:
+        # 多标注任务的 task_id 全部进 test
+        multi_task_ids: set[int] = set()
         test_pairs = list(multi_pairs)
-        random.shuffle(single_pairs)
-        n_extra_test = int(len(single_pairs) * config.test_ratio)
-        test_pairs.extend(single_pairs[:n_extra_test])
-        train_pairs = single_pairs[n_extra_test:]
-        print(f"  策略: 多标注({len(multi_pairs)}) + 单标注抽样({n_extra_test}) → test")
+        for p in multi_pairs:
+            multi_task_ids.add(p["task_id"])
+
+        # 单标注任务按 task_id 分组
+        single_by_task: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        for p in single_pairs:
+            single_by_task[p["task_id"]].append(p)
+
+        # 随机打乱 task_id 列表，按比例分成 train/test
+        task_ids = list(single_by_task.keys())
+        random.shuffle(task_ids)
+        n_test_tasks = int(len(task_ids) * config.test_ratio)
+        test_task_ids = set(task_ids[:n_test_tasks])
+
+        # 按 task_id 分配到 train/test（确保同一 task 的所有副本同侧）
+        train_pairs: list[dict[str, Any]] = []
+        for tid, pairs in single_by_task.items():
+            if tid in test_task_ids:
+                test_pairs.extend(pairs)
+            else:
+                train_pairs.extend(pairs)
+
+        print(f"  策略: 多标注({len(multi_pairs)}对, {len(multi_task_ids)}个task) → test")
+        print(f"        单标注 {len(single_by_task)} 个task → {n_test_tasks} test / {len(task_ids) - n_test_tasks} train")
     else:
-        all_pairs = single_pairs + multi_pairs
-        random.shuffle(all_pairs)
-        n_test = int(len(all_pairs) * config.test_ratio)
-        test_pairs = all_pairs[n_test:]
-        train_pairs = all_pairs[:n_test]
+        all_by_task: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        for p in single_pairs + multi_pairs:
+            all_by_task[p["task_id"]].append(p)
+        task_ids = list(all_by_task.keys())
+        random.shuffle(task_ids)
+        n_test_tasks = int(len(task_ids) * config.test_ratio)
+        test_task_ids = set(task_ids[:n_test_tasks])
+
+        train_pairs = []
+        test_pairs = []
+        for tid, pairs in all_by_task.items():
+            if tid in test_task_ids:
+                test_pairs.extend(pairs)
+            else:
+                train_pairs.extend(pairs)
 
     def to_example(pair: dict[str, Any]) -> InputExample:
         return InputExample(texts=[pair["anchor"], pair["positive"]])
@@ -404,6 +443,15 @@ def split_train_test(
 
     print(f"  训练集: {len(train_examples)} 对")
     print(f"  测试集: {len(test_pairs)} 对")
+
+    # 验证无泄露：train 和 test 的 task_id 不应有交集
+    train_tids = {p["task_id"] for p in train_pairs}
+    test_tids = {p["task_id"] for p in test_pairs}
+    leak = train_tids & test_tids
+    if leak:
+        print(f"  WARNING: {len(leak)} task_ids appear in BOTH train and test!")
+    else:
+        print("  OK: train/test task_ids are fully isolated, no data leak")
 
     # 测试集职业覆盖
     test_codes = set(p["code"] for p in test_pairs)
@@ -442,7 +490,7 @@ def train_model(
     train_loss = MultipleNegativesRankingLoss(model=model)
     warmup_steps = int(len(train_dataloader) * config.epochs * config.warmup_ratio)
 
-    print(f"\n  训练配置:")
+    print("\n  训练配置:")
     print(f"    Batch Size: {config.batch_size}")
     print(f"    Epochs: {config.epochs}")
     print(f"    Learning Rate: {config.learning_rate}")
@@ -570,7 +618,7 @@ def evaluate_model(
             print(f"\n  多标注测试子集 Top1: {multi_top1}/{n_multi} = {multi_top1/n_multi*100:.1f}%")
 
     # 对比基准模型
-    print(f"\n  [对比基准] 未微调基础模型的准确率...")
+    print("\n  [对比基准] 未微调基础模型的准确率...")
     resolved_path = resolve_existing_model_path(base_model_path, label="基础 embedding")
     base_model = SentenceTransformer(str(resolved_path), device=device)
     base_model.max_seq_length = config.max_seq_length
@@ -628,6 +676,7 @@ def main() -> None:
     config.ds_agree_oversample = args.ds_agree_oversample
     config.ds_disagree_oversample = args.ds_disagree_oversample
     config.epochs = args.epochs
+    config.batch_size = args.batch_size
 
     base_model_path = args.base_model_path or DEFAULT_BASE_MODEL_PATH
     output_model_name = args.output_model_name or DEFAULT_OUTPUT_MODEL_NAME

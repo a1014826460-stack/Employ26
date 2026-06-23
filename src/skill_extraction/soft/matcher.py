@@ -1,10 +1,10 @@
 """软技能关键词匹配模块。
 
 职责：
-1. 加载 `dicts/soft_skill_dictionary.json`，构建名称 → 技能条目的映射（含别名）；
+1. 默认从 PostgreSQL `dict.soft_skills` 加载词典，构建名称 → 技能条目的映射（含别名）；
 2. 对输入文本做关键词匹配，返回匹配到的软技能列表；
-3. 与 `dicts/flat_skill_dictionary.json` 硬技能词典做冲突检测，排除同名硬技能；
-4. 复用 `dicts/blacklist_soft_skills.txt` 过滤非技能词。
+3. 默认从 PostgreSQL `dict.hard_skills` 加载硬技能名称做冲突检测；
+4. 显式传入文件路径时保留 JSON/TXT 文件兼容模式。
 
 用法：
     from src.skill_extraction.soft.matcher import SoftSkillMatcher
@@ -22,6 +22,11 @@ from typing import Dict, List, Optional, Set
 
 from config.paths import get_project_paths
 from ..core.dict_paths import get_current_soft_skill_dict_path
+from ..dictionary.pg_dictionary import (
+    load_hard_skill_names_from_pg,
+    load_soft_blacklist_from_pg,
+    load_soft_dictionary_from_pg,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,27 +67,45 @@ class SoftSkillMatcher:
         soft_skill_dict_path: Optional[Path] = None,
         hard_skill_dict_path: Optional[Path] = None,
         blacklist_path: Optional[Path] = None,
+        use_postgres: Optional[bool] = None,
     ) -> None:
         """初始化软技能匹配器。
 
         Args:
-            soft_skill_dict_path: 软技能词典 JSON 路径，默认读取 dicts/soft_skill_dictionary.json。
-            hard_skill_dict_path: 硬技能词典 JSON 路径，默认读取 dicts/flat_skill_dictionary.json。
-            blacklist_path: 黑名单文件路径，默认读取 dicts/blacklist_soft_skills.txt。
+            soft_skill_dict_path: 软技能词典 JSON 路径。传入后强制使用文件词典。
+            hard_skill_dict_path: 硬技能词典 JSON 路径。传入后用于文件模式冲突检测。
+            blacklist_path: 黑名单文件路径。传入后额外用于过滤。
+            use_postgres: 是否从 PostgreSQL 加载词典。None 时在未显式传词典路径的场景启用。
         """
         paths = get_project_paths()
         project_root = paths.project_root
 
-        if soft_skill_dict_path is None:
+        using_default_soft_dictionary = soft_skill_dict_path is None
+        using_default_hard_dictionary = hard_skill_dict_path is None
+        self._use_postgres = (
+            using_default_soft_dictionary and using_default_hard_dictionary
+            if use_postgres is None
+            else use_postgres
+        )
+        if soft_skill_dict_path is None and not self._use_postgres:
             self._soft_skill_dict_path = get_current_soft_skill_dict_path()
+        elif soft_skill_dict_path is None:
+            self._soft_skill_dict_path = project_root / "dicts" / "soft_skill" / "current.txt"
         else:
             self._soft_skill_dict_path = soft_skill_dict_path
         self._hard_skill_dict_path = (
             hard_skill_dict_path or project_root / "dicts" / "flat_skill_dictionary.json"
         )
-        self._blacklist_path = (
-            blacklist_path or project_root / "dicts" / "blacklist_soft_skills.txt"
-        )
+        if blacklist_path is not None:
+            self._blacklist_path = blacklist_path
+        elif using_default_soft_dictionary:
+            self._blacklist_path = (
+                None
+                if self._use_postgres
+                else project_root / "dicts" / "blacklist_soft_skills.txt"
+            )
+        else:
+            self._blacklist_path = None
 
         self._skill_map: Dict[str, tuple[str, str]] = {}
         self._hard_skill_names: Set[str] = set()
@@ -94,6 +117,14 @@ class SoftSkillMatcher:
 
     def _load_soft_skill_dictionary(self) -> None:
         """加载软技能词典，构建关键词 → (标准名, 维度) 映射。"""
+        if self._use_postgres:
+            try:
+                data = load_soft_dictionary_from_pg(active_only=True)
+                self._load_soft_skill_dictionary_data(data)
+                return
+            except Exception as exc:
+                logger.warning("PostgreSQL 软技能词典加载失败，尝试文件兜底: %s", exc)
+
         if not self._soft_skill_dict_path.exists():
             logger.warning("软技能词典不存在: %s", self._soft_skill_dict_path)
             return
@@ -101,6 +132,10 @@ class SoftSkillMatcher:
         with open(self._soft_skill_dict_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        self._load_soft_skill_dictionary_data(data)
+
+    def _load_soft_skill_dictionary_data(self, data: Dict) -> None:
+        """从已加载的软技能词典数据构建关键词索引。"""
         dimensions = data.get("dimensions", {})
         for dim_key, dim_info in dimensions.items():
             skills = dim_info.get("skills", [])
@@ -122,6 +157,17 @@ class SoftSkillMatcher:
 
     def _load_hard_skill_names(self) -> None:
         """加载硬技能词典名称和别名，用于冲突检测。"""
+        if self._use_postgres:
+            try:
+                self._hard_skill_names = load_hard_skill_names_from_pg()
+                logger.info(
+                    "已从 PostgreSQL 加载硬技能词典: %d 个名称/别名用于冲突检测",
+                    len(self._hard_skill_names),
+                )
+                return
+            except Exception as exc:
+                logger.warning("PostgreSQL 硬技能冲突词加载失败，尝试文件兜底: %s", exc)
+
         if not self._hard_skill_dict_path.exists():
             logger.warning("硬技能词典不存在: %s，跳过冲突检测", self._hard_skill_dict_path)
             return
@@ -141,6 +187,18 @@ class SoftSkillMatcher:
 
     def _load_blacklist(self) -> None:
         """加载黑名单词汇。若文件不存在则跳过。"""
+        if self._use_postgres and self._blacklist_path is None:
+            try:
+                self._blacklist = load_soft_blacklist_from_pg()
+                return
+            except Exception as exc:
+                logger.warning("PostgreSQL 软技能黑名单加载失败，跳过黑名单过滤: %s", exc)
+                return
+
+        if self._blacklist_path is None:
+            logger.info("未配置软技能黑名单，跳过黑名单过滤")
+            return
+
         if not self._blacklist_path.exists():
             logger.info("黑名单文件不存在: %s，跳过黑名单过滤", self._blacklist_path)
             return

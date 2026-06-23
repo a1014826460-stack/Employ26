@@ -1,0 +1,33 @@
+[server]
+host = "127.0.0.1"
+port = 8102
+startup_timeout_seconds = 1800
+request_timeout_seconds = 600
+
+[wsl]
+distro = "Ubuntu-24.04"
+vllm_env = "/home/lin/llm-env"
+vllm_bin = "/home/lin/llm-env/bin/vllm"
+
+[model]
+name = "Qwen2.5-3B-Instruct"
+windows_dir = "D:\\model\\models--Qwen--Qwen2.5-3B-Instruct\\snapshots\\aa8e72537993ba99e69dfaafa59ed015b17504d1"
+wsl_dir = "/mnt/d/model/models--Qwen--Qwen2.5-3B-Instruct/snapshots/aa8e72537993ba99e69dfaafa59ed015b17504d1"
+
+[vllm]
+enable_reasoning = false
+dtype = "half"
+max_model_len = 4096
+gpu_memory_utilization = 0.85
+max_num_seqs = 128
+enable_prefix_caching = true
+safetensors_load_strategy = "prefetch"
+trust_remote_code = true
+enable_auto_tool_choice = false
+extra_args = []
+
+[chat]
+temperature = 0.0
+max_tokens = 256
+enable_thinking = false
+system_prompt = "你是职业细类选择器。只输出JSON。"

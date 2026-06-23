@@ -39,11 +39,20 @@ class MatchCandidate:
     """A candidate source row for one Label Studio task."""
 
     source_table: str
+    source_platform: str
     source_row_number: int
     recruitment_record_id: str
+    source_native_job_id: str
+    dedupe_fingerprint: str
     title: str
     description: str
     company_name: str
+    work_city: str
+    salary_raw: str
+    publish_date: str
+    education_requirement_raw: str
+    experience_requirement_raw: str
+    company_industry_raw: str
     score: float
 
 
@@ -115,6 +124,8 @@ def build_task_payload(row: dict[str, Any]) -> dict[str, str]:
             or row.get("job_requirements")
         ),
         "current_recruitment_record_id": display_text(row.get("recruitment_record_id")),
+        "task_sample_source": display_text(data.get("sample_source") or row.get("sample_source")),
+        "task_snapshot_row_id": display_text(data.get("row_id") or row.get("row_id")),
     }
 
 
@@ -135,11 +146,20 @@ def build_source_index(
             index[normalize_text(title)].append(
                 MatchCandidate(
                     source_table=source_table,
+                    source_platform=source_table.split(".", 1)[0].strip('"'),
                     source_row_number=row_number,
                     recruitment_record_id=rrid,
+                    source_native_job_id="",
+                    dedupe_fingerprint="",
                     title=title,
                     description=display_text(row.get("岗位描述", "")),
                     company_name=display_text(row.get("公司名称", "")),
+                    work_city=display_text(row.get("工作城市", "")),
+                    salary_raw=display_text(row.get("薪资水平", "")),
+                    publish_date=display_text(row.get("发布时间", "")),
+                    education_requirement_raw=display_text(row.get("学历要求", "")),
+                    experience_requirement_raw=display_text(row.get("经验要求", "")),
+                    company_industry_raw=display_text(row.get("公司行业", "")),
                     score=0.0,
                 )
             )
@@ -199,6 +219,38 @@ def score_candidate(task_payload: dict[str, str], candidate: MatchCandidate) -> 
     return max(sequence_score, coverage_score)
 
 
+def rank_candidates(
+    task_payload: dict[str, str],
+    candidates: list[MatchCandidate],
+) -> list[MatchCandidate]:
+    """Score and sort all candidates for a task."""
+    return sorted(
+        [
+            MatchCandidate(
+                source_table=c.source_table,
+                source_platform=c.source_platform,
+                source_row_number=c.source_row_number,
+                recruitment_record_id=c.recruitment_record_id,
+                source_native_job_id=c.source_native_job_id,
+                dedupe_fingerprint=c.dedupe_fingerprint,
+                title=c.title,
+                description=c.description,
+                company_name=c.company_name,
+                work_city=c.work_city,
+                salary_raw=c.salary_raw,
+                publish_date=c.publish_date,
+                education_requirement_raw=c.education_requirement_raw,
+                experience_requirement_raw=c.experience_requirement_raw,
+                company_industry_raw=c.company_industry_raw,
+                score=score_candidate(task_payload, c),
+            )
+            for c in candidates
+        ],
+        key=lambda item: item.score,
+        reverse=True,
+    )
+
+
 def choose_candidate(
     task_payload: dict[str, str],
     candidates: list[MatchCandidate],
@@ -208,22 +260,7 @@ def choose_candidate(
         return "MISSING_TASK_TITLE", "no_title", None, None, None, 0
     if not candidates:
         return "UNMATCHED", "no_same_title_candidate", None, None, None, 0
-    scored = sorted(
-        [
-            MatchCandidate(
-                source_table=c.source_table,
-                source_row_number=c.source_row_number,
-                recruitment_record_id=c.recruitment_record_id,
-                title=c.title,
-                description=c.description,
-                company_name=c.company_name,
-                score=score_candidate(task_payload, c),
-            )
-            for c in candidates
-        ],
-        key=lambda item: item.score,
-        reverse=True,
-    )
+    scored = rank_candidates(task_payload, candidates)
     best = scored[0]
     second_score = scored[1].score if len(scored) > 1 else None
     if best.score >= 0.999:
@@ -248,7 +285,7 @@ def load_task_rows() -> list[dict[str, Any]]:
                 for row in conn.execute(
                     text(
                         f"""
-                        select id, job_title, job_requirements, recruitment_record_id, data_raw
+                        select id, row_id, sample_source, job_title, job_requirements, recruitment_record_id, data_raw
                         from {TASK_TABLE}
                         order by id
                         """

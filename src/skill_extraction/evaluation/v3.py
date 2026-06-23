@@ -714,9 +714,6 @@ def run(
             / "skill_extraction"
             / "soft_skill_eval_dataset.jsonl"
         )
-    if dict_path is None:
-        dict_path = str(project_root / "dicts" / "flat_skill_dictionary.json")
-
     # 加载硬技能数据集
     hard_samples = _load_hard_skill_dataset(Path(hard_dataset_path))
     logger.info("加载硬技能评估数据: %d 样本", len(hard_samples))
@@ -726,9 +723,17 @@ def run(
     logger.info("加载软技能评估数据: %d 样本", len(soft_samples))
 
     # 初始化匹配器
-    from ..hard.matcher import FlatHardSkillMatcher, load_flat_dictionary
+    from ..hard.matcher import (
+        FlatHardSkillMatcher,
+        load_flat_dictionary,
+        load_flat_dictionary_from_pg,
+    )
 
-    hard_dict = load_flat_dictionary(dict_path)
+    hard_dict = (
+        load_flat_dictionary_from_pg()
+        if dict_path is None
+        else load_flat_dictionary(dict_path)
+    )
     hard_matcher = FlatHardSkillMatcher(hard_dict)
 
     from ..soft.matcher import SoftSkillMatcher

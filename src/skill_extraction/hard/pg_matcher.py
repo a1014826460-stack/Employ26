@@ -15,7 +15,11 @@ from typing import Any, Iterable, Sequence
 
 from config.paths import get_project_paths
 
-from .matcher import FlatHardSkillMatcher, load_flat_dictionary
+from .matcher import (
+    FlatHardSkillMatcher,
+    load_flat_dictionary,
+    load_flat_dictionary_from_pg,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -233,9 +237,12 @@ def run_match_pg(
     write: bool = True,
 ) -> list[HardSkillMatchRecord]:
     """运行 PostgreSQL 硬技能匹配流程。"""
-    paths = get_project_paths()
-    resolved_dict = dict_path or paths.dict_dir / "flat_skill_dictionary.json"
-    matcher = FlatHardSkillMatcher(load_flat_dictionary(resolved_dict))
+    flat_dict = (
+        load_flat_dictionary_from_pg()
+        if dict_path is None
+        else load_flat_dictionary(dict_path)
+    )
+    matcher = FlatHardSkillMatcher(flat_dict)
     records = fetch_latest_parsed_records(source_table, limit=limit)
     results = match_records(records, matcher)
     logger.info("硬技能匹配完成: %d 条记录", len(results))

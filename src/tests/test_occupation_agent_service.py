@@ -4,7 +4,9 @@ from src.llm.occupation_agent_service import (
     OccupationAnalysisRequest,
     build_llm_messages,
     extract_top_candidates,
+    request_to_dict,
 )
+from src.occupation_retrieval.top10_selector import Top10SelectionResult
 
 
 def test_extract_top_candidates_keeps_ranked_top10_fields():
@@ -60,3 +62,30 @@ def test_build_llm_messages_contains_job_candidates_and_report_contract():
     assert "Top10" in messages[1]["content"]
     assert "算法工程技术人员" in messages[1]["content"]
     assert "最终建议" in messages[1]["content"]
+
+
+def test_request_to_dict_keeps_boolean_and_topk_fields():
+    payload = request_to_dict(
+        OccupationAnalysisRequest(
+            job_title="算法工程师",
+            job_description="负责推荐算法",
+            top_k=10,
+            include_llm_report=True,
+        )
+    )
+    assert payload["job_title"] == "算法工程师"
+    assert payload["top_k"] == 10
+    assert payload["include_llm_report"] is True
+
+
+def test_top10_selection_result_has_stable_fields():
+    result = Top10SelectionResult(
+        selected_rank=2,
+        selected_code="2-02-10-09",
+        selected_title="人工智能工程技术人员",
+        reason="更贴近职责",
+        confidence=0.82,
+        needs_review=False,
+    )
+    assert result.selected_rank == 2
+    assert result.selected_code == "2-02-10-09"

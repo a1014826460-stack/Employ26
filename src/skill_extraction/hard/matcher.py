@@ -228,6 +228,13 @@ def save_flat_dictionary(data: Dict, path: str | Path) -> None:
     logger.info("词典已保存: %s", out_path)
 
 
+def load_flat_dictionary_from_pg() -> Dict:
+    """从 PostgreSQL `dict.hard_skills` 加载平面化硬技能词典。"""
+    from ..dictionary.pg_dictionary import load_flat_dictionary_from_pg as _load
+
+    return _load()
+
+
 # ============================================================================
 #  FlatHardSkillMatcher — 平面化词典匹配器
 # ============================================================================

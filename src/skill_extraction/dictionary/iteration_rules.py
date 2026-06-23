@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RULES_PATH = PROJECT_ROOT / "config" / "skill_dictionary_iteration.json"
 
 

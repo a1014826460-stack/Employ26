@@ -18,8 +18,6 @@ import argparse
 import csv
 import json
 import logging
-import os
-import re
 import threading
 import time
 import traceback
@@ -31,11 +29,11 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
 from sqlalchemy import text
 
 from config.paths import get_project_paths
 from src.db.postgres import create_pg_engine, get_table_columns, table_exists
+from src.llm.deepseek_client import DeepSeekClient, DeepSeekConfig
 from src.occupation_retrieval.datasets import get_majority_choice, parse_choice
 
 PROJECT_PATHS = get_project_paths()
@@ -346,39 +344,18 @@ def validate_response(parsed: dict[str, Any], task_id: int) -> str | None:
     return None
 
 
-def parse_json_response(raw_text: str) -> dict[str, Any]:
-    """从模型原始响应中解析 JSON。"""
-    text_value = raw_text.strip()
-    text_value = text_value.replace("```json", "").replace("```", "").strip()
-    try:
-        result = json.loads(text_value)
-        return result if isinstance(result, dict) else {}
-    except json.JSONDecodeError:
-        pass
+class Round2DeepSeekRelabeler:
+    """DeepSeek 检验性标注客户端封装。"""
 
-    match = re.search(r"\{.*\}", text_value, flags=re.DOTALL)
-    if match:
-        try:
-            result = json.loads(match.group(0))
-            return result if isinstance(result, dict) else {}
-        except json.JSONDecodeError:
-            pass
-    return {}
-
-
-class DeepSeekClient:
-    """DeepSeek 检验性标注客户端。"""
-
-    def __init__(self, *, model: str, timeout: int):
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        if not api_key:
-            raise RuntimeError("DEEPSEEK_API_KEY 未设置")
-        self.model = model
-        self.timeout = timeout
-        self._api_key = api_key
-
-    def _client(self) -> OpenAI:
-        return OpenAI(api_key=self._api_key, base_url="https://api.deepseek.com")
+    def __init__(self, *, model: str, timeout: int, retries: int) -> None:
+        self.client = DeepSeekClient(
+            DeepSeekConfig(
+                api_key=os.getenv("DEEPSEEK_API_KEY", ""),
+                model=model,
+                timeout=timeout,
+                retries=retries,
+            )
+        )
 
     def relabel(self, task: Round2Task) -> dict[str, Any]:
         """调用 DeepSeek 并返回已校验的记录。"""
@@ -396,23 +373,12 @@ class DeepSeekClient:
             code_e=task.candidates["E"]["code"],
             title_e=task.candidates["E"]["title"],
         )
-        response = self._client().chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
+        parsed, raw = self.client.complete_json_with_raw(
+            system_prompt=JUDGE_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
             temperature=0.0,
             max_tokens=1024,
-            timeout=self.timeout,
         )
-        choice = response.choices[0]
-        message = choice.message
-        raw = (getattr(message, "content", None) or "").strip()
-        if not raw:
-            raw = (getattr(message, "reasoning_content", None) or "").strip()
-        parsed = parse_json_response(raw)
         error = validate_response(parsed, task.task_id)
         if error:
             raise ValueError(error)
@@ -534,7 +500,7 @@ def append_diff(record: dict[str, Any], lock: threading.Lock) -> None:
 def process_task(
     task: Round2Task,
     *,
-    client: DeepSeekClient,
+    client: Round2DeepSeekRelabeler,
     retries: int,
     retry_sleep: float,
 ) -> tuple[bool, dict[str, Any]]:
@@ -655,7 +621,11 @@ def run(args: argparse.Namespace) -> None:
         logger.info("dry-run 覆盖情况: %s", coverage)
         return
 
-    client = DeepSeekClient(model=args.model, timeout=args.timeout)
+    client = Round2DeepSeekRelabeler(
+        model=args.model,
+        timeout=args.timeout,
+        retries=max(0, args.retries),
+    )
     raw_writer = ThreadSafeJsonlWriter(RAW_JSONL)
     error_writer = ThreadSafeJsonlWriter(ERROR_JSONL)
     diff_lock = threading.Lock()
@@ -716,7 +686,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=90, help="单次 API 超时秒数")
     parser.add_argument("--retries", type=int, default=1, help="失败重试次数")
     parser.add_argument("--retry-sleep", type=float, default=1.5, help="重试等待秒数")
-    parser.add_argument("--model", default="deepseek-v4-pro", help="DeepSeek 模型名")
+    parser.add_argument("--model", default="deepseek-chat", help="DeepSeek 模型名")
     parser.add_argument("--force", action="store_true", help="忽略 PG 断点，强制重跑并覆盖")
     parser.add_argument("--dry-run", action="store_true", help="只检查覆盖和待处理数量，不调用 API")
     parser.add_argument("--progress-interval", type=int, default=100, help="每 N 条打印一次进度")

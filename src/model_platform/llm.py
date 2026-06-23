@@ -148,8 +148,15 @@ class ExternalAPIClient:
     def __post_init__(self) -> None:
         self.router = LLMRouter.from_env(self.runtime.llm_env_file)
 
+    @staticmethod
+    def _normalize_router_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Drop protocol-level kwargs not accepted by LLMRouter."""
+        normalized = dict(kwargs)
+        normalized.pop("temperature", None)
+        return normalized
+
     def complete_text(self, **kwargs: Any) -> str:
-        return self.router.complete_text(**kwargs)
+        return self.router.complete_text(**self._normalize_router_kwargs(kwargs))
 
     def complete_json(self, **kwargs: Any) -> dict[str, Any] | list[Any]:
         text = self.complete_text(**kwargs)

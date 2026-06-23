@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from src.skill_extraction.config import SkillExtractionConfig, load_skill_extraction_config
+from src.occupation_retrieval.top10_selector import selection_to_dict, select_from_top10
 from src.utils.vllm_utils import (
     VLLMConfig,
     chat_completion,
@@ -186,8 +187,23 @@ class OccupationAgentService:
         top1 = candidates[0] if candidates else None
         llm_report = ""
         llm_finish_reason = None
+        llm_selected = None
+        final_selection = top1
 
         if request.include_llm_report:
+            llm_selected_result = select_from_top10(
+                job_title=request.job_title,
+                job_description=request.job_description,
+                top10_candidates=candidates,
+            )
+            llm_selected = selection_to_dict(llm_selected_result)
+            if llm_selected_result.selected_code:
+                final_selection = {
+                    "rank": llm_selected_result.selected_rank,
+                    "code": llm_selected_result.selected_code,
+                    "title": llm_selected_result.selected_title,
+                    "selection_source": "llm_over_top10",
+                }
             messages = build_llm_messages(request=request, candidates=candidates)
             session = create_http_session()
             check_server(self.vllm_config, session=session)
@@ -208,6 +224,8 @@ class OccupationAgentService:
             },
             "top1": top1,
             "top10_candidates": candidates,
+            "llm_selected": llm_selected,
+            "final_selection": final_selection,
             "llm_report": llm_report,
             "llm_finish_reason": llm_finish_reason,
         }

@@ -106,12 +106,9 @@ def cmd_run(
         _load_soft_skill_dataset,
         evaluate,
     )
-    from ..hard.matcher import FlatHardSkillMatcher, load_flat_dictionary
+    from ..hard.matcher import FlatHardSkillMatcher, load_flat_dictionary_from_pg
     from ..soft.matcher import SoftSkillMatcher
 
-    from config.paths import get_project_paths
-
-    project_root = get_project_paths().project_root
     registry_dir = eval_dir or _get_eval_dir()
 
     dict_path = get_current_soft_skill_dict_path()
@@ -124,8 +121,7 @@ def cmd_run(
     soft_samples = _load_soft_skill_dataset(soft_path)
     logger.info("loaded data: hard=%d, soft=%d", len(hard_samples), len(soft_samples))
 
-    hard_dict_path = project_root / "dicts" / "flat_skill_dictionary.json"
-    hard_dict = load_flat_dictionary(str(hard_dict_path))
+    hard_dict = load_flat_dictionary_from_pg()
     hard_matcher = FlatHardSkillMatcher(hard_dict)
     soft_matcher = SoftSkillMatcher()
 
