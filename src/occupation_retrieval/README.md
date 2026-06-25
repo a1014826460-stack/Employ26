@@ -30,6 +30,9 @@
 - 离线 Top10 质检报告：`output/occupation_retrieval/offline_top10_qc_report.md`
 - 任务源身份主表：`annotations.label_studio_task_source_identity`
 - 任务源身份候选表：`annotations.label_studio_task_source_identity_candidates`
+- 数据库归档清单：PostgreSQL `archive_occ.archive_manifest`
+- 人工与 DeepSeek 分歧复核 CSV：`output/occupation_retrieval/human_deepseek_disagreements_20260622.csv`
+- 归档与导出 SQL：`output/occupation_retrieval/sql/archive_deprecated_annotations_20260622.sql`、`output/occupation_retrieval/sql/export_human_deepseek_disagreements_20260622.sql`
 
 ## 2.1 四项任务的端到端执行方案
 
@@ -1115,5 +1118,23 @@ python -m src.occupation_retrieval.offline_top10_qc --use-llm-review
 - 其他历史版本转入 `archive/` 或标注为 `experimental/`
 
 这样可以减少“v1 / v3 / v4 / weighted”继续并列扩散，避免后续维护成本持续上升。
+
+### 8.1 已执行的数据库归档与复核样本导出
+
+2026-06-22 已对 PostgreSQL `Employ26` 中 `annotations` schema 做了一次保守归档：
+
+- `annotations.label_studio_annotations` 已完整复制到 `archive_occ.label_studio_annotations__20260622_001500`，原表重命名为 `annotations.label_studio_annotations_archived_20260622_001500`，行数为 `5170`。
+- `annotations.label_studio_tasks_v2_rrid_backup_20260618_022807` 已完整复制到 `archive_occ.label_studio_tasks_v2_rrid_backup_20260618_022807__20260622_001500`，原表重命名为 `annotations.label_studio_tasks_v2_rrid_backup_20260618_022807_archived_20260622_001500`，行数为 `18611`。
+- 归档 manifest 记录在 `archive_occ.archive_manifest`，包含归档原因、检测规则、源表行数、归档表行数和回滚 SQL。
+- 可复用脚本：`output/occupation_retrieval/sql/archive_deprecated_annotations_20260622.sql`。
+
+同日已导出人工标注与 DeepSeek 重标结果的分歧复核 CSV：
+
+- 文件：`output/occupation_retrieval/human_deepseek_disagreements_20260622.csv`
+- 编码：UTF-8 with BOM
+- 记录数：`11893` 条非“相同”记录
+- 列：`职位名称`、`任职要求`、`人工标注原始结果`、`DeepSeek标注结果`、`差异情况`、`Top5候选`
+- 数据口径：当前数据库不存在 `annotation_results` 表，因此导出查询由 `annotations.label_studio_tasks_v2` 与 `annotations.deepseek_relabel_raw` 联结生成。
+- 可复用查询：`output/occupation_retrieval/sql/export_human_deepseek_disagreements_20260622.sql`。
 
 

@@ -2,7 +2,11 @@
 import json
 import pytest
 from pathlib import Path
-from src.skill_extraction.evaluation.cli import build_parser, cmd_list
+from src.skill_extraction.evaluation.cli import (
+    _resolve_dict_version,
+    build_parser,
+    cmd_list,
+)
 
 
 SAMPLE_RECORD = {
@@ -42,6 +46,12 @@ class TestBuildParser:
         assert args.version_a == "v1"
         assert args.version_b == "v2"
 
+    def test_audit_pg_dict_subcommand(self):
+        parser = build_parser()
+        args = parser.parse_args(["audit-pg-dict", "--probe-limit", "5"])
+        assert args.command == "audit-pg-dict"
+        assert args.probe_limit == 5
+
     def test_no_command_shows_help(self):
         parser = build_parser()
         with pytest.raises(SystemExit):
@@ -58,6 +68,13 @@ class TestCmdList:
 
 
 class TestCmdRun:
+    def test_resolve_dict_version_falls_back_to_pg_current(self, tmp_path, monkeypatch):
+        from src.skill_extraction.core import dict_paths
+
+        monkeypatch.setattr(dict_paths, "_SOFT_SKILL_DICT_DIR", tmp_path)
+
+        assert _resolve_dict_version() == "pg_current"
+
     def test_run_creates_registry_record(self, tmp_path, monkeypatch):
         import json
         from src.skill_extraction.evaluation.cli import cmd_run

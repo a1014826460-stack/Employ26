@@ -24,6 +24,21 @@ def _get_eval_dir() -> Path:
     return get_project_paths().project_root / "output" / "skill_extraction" / "eval"
 
 
+def _resolve_dict_version() -> str:
+    """Resolve the dictionary version label used by eval registry records.
+
+    File-based soft dictionaries use ``dicts/soft_skill/current.txt``.  The
+    PostgreSQL-first matcher path does not require that file, so evaluation must
+    still have a stable version label when the local marker is absent.
+    """
+    from ..core.dict_paths import get_current_soft_skill_dict_path
+
+    try:
+        return get_current_soft_skill_dict_path().stem
+    except FileNotFoundError:
+        return "pg_current"
+
+
 def cmd_list(eval_dir: Optional[Path] = None) -> None:
     """列出所有评估记录。
 
@@ -80,6 +95,32 @@ def build_parser() -> argparse.ArgumentParser:
     cmp_parser = sub.add_parser("compare", help="compare two versions")
     cmp_parser.add_argument("version_a")
     cmp_parser.add_argument("version_b")
+    audit_parser = sub.add_parser(
+        "audit-pg-dict",
+        help="audit PostgreSQL skill dictionary coverage and aliases",
+    )
+    audit_parser.add_argument(
+        "--hard-dataset",
+        default=None,
+        help="hard skill gold dataset path (default: eval/hard_skill_eval_dataset.jsonl)",
+    )
+    audit_parser.add_argument(
+        "--soft-dataset",
+        default=None,
+        help="soft skill gold dataset path (default: eval/soft_skill_gold_dataset.jsonl)",
+    )
+    audit_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="audit output directory (default: eval/<dict_version>)",
+    )
+    audit_parser.add_argument("--schema", default="dict", help="PostgreSQL schema")
+    audit_parser.add_argument(
+        "--probe-limit",
+        type=int,
+        default=200,
+        help="max risky aliases to probe with matchers",
+    )
     sub.add_parser("list", help="list all eval records")
 
     return parser
@@ -99,7 +140,6 @@ def cmd_run(
         soft_dataset: 软技能 gold dataset 路径。
         use_llm: 是否启用 LLM 软技能验证。
     """
-    from ..core.dict_paths import get_current_soft_skill_dict_path
     from .registry import append_eval_record
     from .v3 import (
         _load_hard_skill_dataset,
@@ -111,8 +151,7 @@ def cmd_run(
 
     registry_dir = eval_dir or _get_eval_dir()
 
-    dict_path = get_current_soft_skill_dict_path()
-    version = dict_path.stem
+    version = _resolve_dict_version()
     logger.info("current soft skill dict version: %s", version)
 
     hard_path = hard_dataset or (registry_dir / "hard_skill_eval_dataset.jsonl")
@@ -235,6 +274,46 @@ def cmd_compare(
         print(f"{label:<18} {_pct(a_val):<10} {_pct(b_val):<10} {d}")
 
 
+def cmd_audit_pg_dict(
+    eval_dir: Optional[Path] = None,
+    hard_dataset: Optional[Path] = None,
+    soft_dataset: Optional[Path] = None,
+    output_dir: Optional[Path] = None,
+    schema: str = "dict",
+    probe_limit: int = 200,
+) -> None:
+    """Run PostgreSQL dictionary coverage and alias audit."""
+    from .pg_dictionary_audit import run_pg_dictionary_audit
+
+    registry_dir = eval_dir or _get_eval_dir()
+    version = _resolve_dict_version()
+    hard_path = hard_dataset or (registry_dir / "hard_skill_eval_dataset.jsonl")
+    soft_path = soft_dataset or (registry_dir / "soft_skill_gold_dataset.jsonl")
+    audit_dir = output_dir or (registry_dir / version)
+
+    result = run_pg_dictionary_audit(
+        output_dir=audit_dir,
+        hard_dataset=hard_path,
+        soft_dataset=soft_path,
+        schema=schema,
+        probe_limit=probe_limit,
+    )
+    summary = result["summary"]
+    coverage = summary["gold_dictionary_coverage"]
+    alias = summary["alias_audit"]
+
+    print("\n=== PostgreSQL dictionary audit done ===")
+    print(f"hard gold coverage: {coverage['hard_gold_coverage']:.4f}")
+    print(f"soft gold coverage: {coverage['soft_gold_coverage']:.4f}")
+    print(
+        "alias conflicts: "
+        f"{alias['conflict_rows']}  risky aliases: {alias['risky_alias_rows']}  "
+        f"wrong probes: {alias['wrong_mapping_probe_rows']}"
+    )
+    for label, path in result["paths"].items():
+        print(f"{label}: {path}")
+
+
 def _update_latest_link(eval_dir: Path, version: str) -> None:
     """更新 latest 链接指向最新版本。
 
@@ -280,6 +359,26 @@ def main() -> None:
         )
     elif args.command == "compare":
         cmd_compare(args.version_a, args.version_b)
+    elif args.command == "audit-pg-dict":
+        cmd_audit_pg_dict(
+            hard_dataset=(
+                Path(getattr(args, "hard_dataset", None))
+                if getattr(args, "hard_dataset", None)
+                else None
+            ),
+            soft_dataset=(
+                Path(getattr(args, "soft_dataset", None))
+                if getattr(args, "soft_dataset", None)
+                else None
+            ),
+            output_dir=(
+                Path(getattr(args, "output_dir", None))
+                if getattr(args, "output_dir", None)
+                else None
+            ),
+            schema=getattr(args, "schema", "dict"),
+            probe_limit=getattr(args, "probe_limit", 200),
+        )
     else:
         parser.print_help()
 

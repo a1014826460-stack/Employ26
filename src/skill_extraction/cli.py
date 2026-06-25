@@ -42,6 +42,12 @@ def _add_eval_commands(subparsers: argparse._SubParsersAction) -> None:
     compare = eval_sub.add_parser("compare", help="对比两个评估版本")
     compare.add_argument("version_a")
     compare.add_argument("version_b")
+    audit = eval_sub.add_parser("audit-pg-dict", help="审计 PostgreSQL 技能词典覆盖和 alias")
+    audit.add_argument("--hard-dataset", default=None)
+    audit.add_argument("--soft-dataset", default=None)
+    audit.add_argument("--output-dir", default=None)
+    audit.add_argument("--schema", default="dict")
+    audit.add_argument("--probe-limit", type=int, default=200)
     eval_sub.add_parser("list", help="列出评估记录")
 
 
@@ -123,12 +129,20 @@ def _handle_pipeline(args: argparse.Namespace) -> None:
 
 
 def _handle_eval(args: argparse.Namespace) -> None:
-    from .evaluation.cli import cmd_compare, cmd_list, cmd_run
+    from .evaluation.cli import cmd_audit_pg_dict, cmd_compare, cmd_list, cmd_run
 
     if args.eval_command == "run":
         cmd_run()
     elif args.eval_command == "compare":
         cmd_compare(args.version_a, args.version_b)
+    elif args.eval_command == "audit-pg-dict":
+        cmd_audit_pg_dict(
+            hard_dataset=Path(args.hard_dataset) if args.hard_dataset else None,
+            soft_dataset=Path(args.soft_dataset) if args.soft_dataset else None,
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+            schema=args.schema,
+            probe_limit=args.probe_limit,
+        )
     elif args.eval_command == "list":
         cmd_list()
     else:
